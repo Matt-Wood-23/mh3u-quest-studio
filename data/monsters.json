@@ -1,0 +1,345 @@
+{
+ "_source": "names: data/em_id_map.json (verified em-ID map); base_hp: em_status00 +0x10 BE u32 from each emNNN.arc",
+ "monsters": {
+  "1": {
+   "name": "Rathian",
+   "base_hp": 4500
+  },
+  "2": {
+   "name": "Rathalos",
+   "base_hp": 3800
+  },
+  "3": {
+   "name": "Qurupeco",
+   "base_hp": 3800
+  },
+  "4": {
+   "name": "Gigginox",
+   "base_hp": 4200
+  },
+  "5": {
+   "name": "Barioth",
+   "base_hp": 3800
+  },
+  "6": {
+   "name": "Diablos",
+   "base_hp": 4000
+  },
+  "7": {
+   "name": "Deviljho",
+   "base_hp": 6600
+  },
+  "8": {
+   "name": "Barroth",
+   "base_hp": 4000
+  },
+  "9": {
+   "name": "Uragaan",
+   "base_hp": 4300
+  },
+  "10": {
+   "name": "Jaggi",
+   "base_hp": 90
+  },
+  "11": {
+   "name": "Jaggia",
+   "base_hp": 130
+  },
+  "12": {
+   "name": "Great Jaggi",
+   "base_hp": 2000
+  },
+  "13": {
+   "name": "Baggi",
+   "base_hp": 150
+  },
+  "14": {
+   "name": "Great Baggi",
+   "base_hp": 3300
+  },
+  "15": {
+   "name": "Lagiacrus",
+   "base_hp": 4300
+  },
+  "16": {
+   "name": "Royal Ludroth",
+   "base_hp": 3800
+  },
+  "17": {
+   "name": "Ludroth",
+   "base_hp": 180
+  },
+  "18": {
+   "name": "Gobul",
+   "base_hp": 4300
+  },
+  "19": {
+   "name": "Agnaktor",
+   "base_hp": 4600
+  },
+  "20": {
+   "name": "Ceadeus",
+   "base_hp": 15000
+  },
+  "21": {
+   "name": "Uroktor",
+   "base_hp": 220
+  },
+  "22": {
+   "name": "Delex",
+   "base_hp": 100
+  },
+  "23": {
+   "name": "Epioth",
+   "base_hp": 90
+  },
+  "24": {
+   "name": "Alatreon",
+   "base_hp": 10000
+  },
+  "25": {
+   "name": "Jhen Mohran",
+   "base_hp": 18500
+  },
+  "26": {
+   "name": "Giggi",
+   "base_hp": 210
+  },
+  "27": {
+   "name": "Aptonoth",
+   "base_hp": 110
+  },
+  "28": {
+   "name": "Popo",
+   "base_hp": 145
+  },
+  "29": {
+   "name": "Rhenoplos",
+   "base_hp": 140
+  },
+  "30": {
+   "name": "Felyne",
+   "base_hp": 50
+  },
+  "31": {
+   "name": "Melynx",
+   "base_hp": 50
+  },
+  "32": {
+   "name": "Fish",
+   "base_hp": 150
+  },
+  "33": {
+   "name": "Altaroth",
+   "base_hp": 60
+  },
+  "34": {
+   "name": "Kelbi",
+   "base_hp": 70
+  },
+  "35": {
+   "name": "Giggi Egg",
+   "base_hp": 200
+  },
+  "36": {
+   "name": "Bnahabra (Blue)",
+   "base_hp": 40
+  },
+  "37": {
+   "name": "Bnahabra (Red)",
+   "base_hp": 40
+  },
+  "38": {
+   "name": "Bnahabra (Green/Brown)",
+   "base_hp": 40
+  },
+  "39": {
+   "name": "Bnahabra (Green/Brown)",
+   "base_hp": 40
+  },
+  "40": {
+   "name": "Boulder (Underwater)",
+   "base_hp": 80
+  },
+  "41": {
+   "name": "Zinogre",
+   "base_hp": 5000
+  },
+  "42": {
+   "name": "Arzuros",
+   "base_hp": 2000
+  },
+  "43": {
+   "name": "Lagombi",
+   "base_hp": 3200
+  },
+  "44": {
+   "name": "Volvidon",
+   "base_hp": 3000
+  },
+  "45": {
+   "name": "Great Wroggi",
+   "base_hp": 2500
+  },
+  "46": {
+   "name": "Duramboros",
+   "base_hp": 6600
+  },
+  "47": {
+   "name": "Nibelsnarf",
+   "base_hp": 4000
+  },
+  "48": {
+   "name": "Wroggi",
+   "base_hp": 120
+  },
+  "49": {
+   "name": "Slagtoth",
+   "base_hp": 180
+  },
+  "50": {
+   "name": "Gargwa",
+   "base_hp": 90
+  },
+  "51": {
+   "name": "Crimson Qurupeco",
+   "base_hp": 4000
+  },
+  "52": {
+   "name": "Baleful Gigginox",
+   "base_hp": 4400
+  },
+  "53": {
+   "name": "Sand Barioth",
+   "base_hp": 3800
+  },
+  "54": {
+   "name": "Jade Barroth",
+   "base_hp": 4200
+  },
+  "55": {
+   "name": "Steel Uragaan",
+   "base_hp": 4100
+  },
+  "56": {
+   "name": "Purple Ludroth",
+   "base_hp": 4200
+  },
+  "57": {
+   "name": "Glacial Agnaktor",
+   "base_hp": 4800
+  },
+  "58": {
+   "name": "Black Diablos",
+   "base_hp": 4000
+  },
+  "59": {
+   "name": "Nargacuga",
+   "base_hp": 4200
+  },
+  "60": {
+   "name": "Green Nargacuga",
+   "base_hp": 4200
+  },
+  "61": {
+   "name": "Lucent Nargacuga",
+   "base_hp": 5500
+  },
+  "62": {
+   "name": "Pink Rathian",
+   "base_hp": 4500
+  },
+  "63": {
+   "name": "Gold Rathian",
+   "base_hp": 4500
+  },
+  "64": {
+   "name": "Azure Rathalos",
+   "base_hp": 3800
+  },
+  "65": {
+   "name": "Silver Rathalos",
+   "base_hp": 4000
+  },
+  "66": {
+   "name": "Plesioth",
+   "base_hp": 4000
+  },
+  "67": {
+   "name": "Green Plesioth",
+   "base_hp": 4000
+  },
+  "68": {
+   "name": "Ivory Lagiacrus",
+   "base_hp": 5000
+  },
+  "69": {
+   "name": "Abyssal Lagiacrus",
+   "base_hp": 4300
+  },
+  "70": {
+   "name": "Goldbeard Ceadeus",
+   "base_hp": 11000
+  },
+  "71": {
+   "name": "Savage Deviljho",
+   "base_hp": 6000
+  },
+  "72": {
+   "name": "Stygian Zinogre",
+   "base_hp": 5000
+  },
+  "73": {
+   "name": "Rust Duramboros",
+   "base_hp": 6600
+  },
+  "74": {
+   "name": "Brachydios",
+   "base_hp": 4500
+  },
+  "75": {
+   "name": "Dire Miralis",
+   "base_hp": 20000
+  },
+  "76": {
+   "name": "Bullfango",
+   "base_hp": 120
+  },
+  "77": {
+   "name": "Anteka",
+   "base_hp": 80
+  },
+  "78": {
+   "name": "Slagtoth (Red)",
+   "base_hp": 180
+  },
+  "79": {
+   "name": "Boulder (Deserted Island)",
+   "base_hp": 80
+  },
+  "80": {
+   "name": "Boulder (Sandy Plains)",
+   "base_hp": 80
+  },
+  "81": {
+   "name": "Boulder (Flooded Forest)",
+   "base_hp": 80
+  },
+  "82": {
+   "name": "Boulder (Tundra)",
+   "base_hp": 80
+  },
+  "83": {
+   "name": "Boulder (Volcano)",
+   "base_hp": 80
+  },
+  "84": {
+   "name": "Boulder (Misty Peaks)",
+   "base_hp": 80
+  },
+  "85": {
+   "name": "Hallowed Jhen Mohran",
+   "base_hp": 14700
+  }
+ }
+}

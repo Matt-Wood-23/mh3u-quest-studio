@@ -1,0 +1,306 @@
+{
+ "description": "Per-monster stage placement legality, dumped from the RPX static table @0x101f9c80 (MH3G_Cafe_US v1.3 ELF, Ghidra, 2026-07-03). placement[em_id] = list of INTERNAL stage ids the monster has spawn-placement data for. A quest whose slot-0 monster lacks the quest's stage CRASHES at quest load (null deref in FUN_0216d798); later slots are empirically laxer (Silver Rathalos played at slot 3 on a stage not in his list) but treat any mismatch as a warning.",
+ "internal_stage_names": {
+  "1": "Deserted Island",
+  "2": "Sandy Plains",
+  "3": "Flooded Forest",
+  "4": "Tundra",
+  "5": "Volcano",
+  "6": "Great Desert (Jhen)",
+  "7": "Underwater Ruin (Ceadeus)",
+  "8": "Land Arena (event + grudge, QTDS map 8)",
+  "9": "Event Water Arena (QTDS map 10)",
+  "10": "Sacred Land (QTDS map 11)",
+  "11": "Water Arena (QTDS map 12)",
+  "12": "Misty Peaks (QTDS map 13)",
+  "13": "Tower (QTDS map 14)",
+  "14": "Tainted Sea (QTDS map 15)"
+ },
+ "quest_map_to_internal": {
+  "1": 1,
+  "2": 2,
+  "3": 3,
+  "4": 4,
+  "5": 5,
+  "6": 6,
+  "7": 7,
+  "8": 8,
+  "9": null,
+  "10": 9,
+  "11": 10,
+  "12": 11,
+  "13": 12,
+  "14": 13,
+  "15": 14
+ },
+ "quest_map_to_internal_notes": "QTDS maps 1-8 = identity (anchored by Rathian/Rathalos/Deviljho/Jhen/Ceadeus quest coverage + the arena crash). QTDS 10-15 = internal-1 (anchored: Alatreon [10]=Sacred Land 11, Dire Miralis [14]=Tainted Sea 15, Gold/Silver/Lucent [13]=Tower 14, Zinogre/Great Jaggi [12]=Misty Peaks 13, Gobul/R.Ludroth [11]=Water Arena 12). QTDS 9 'Land Arena' has no observed internal id (base grudge quests use map 8) -> unknown, treat as unchecked.",
+ "placement": {
+  "1": [
+   1,
+   2,
+   3,
+   8,
+   12
+  ],
+  "2": [
+   1,
+   5,
+   8
+  ],
+  "3": [
+   1,
+   2,
+   8,
+   12
+  ],
+  "4": [
+   4,
+   8
+  ],
+  "5": [
+   4,
+   8
+  ],
+  "6": [
+   1,
+   2,
+   8
+  ],
+  "7": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   8,
+   12
+  ],
+  "8": [
+   1,
+   2,
+   8
+  ],
+  "9": [
+   1,
+   5,
+   8
+  ],
+  "12": [
+   1,
+   2,
+   8,
+   12
+  ],
+  "14": [
+   1,
+   4,
+   8
+  ],
+  "15": [
+   1,
+   3,
+   8,
+   11
+  ],
+  "16": [
+   1,
+   3,
+   8,
+   11
+  ],
+  "18": [
+   1,
+   3,
+   9,
+   11
+  ],
+  "19": [
+   5,
+   8
+  ],
+  "20": [
+   7
+  ],
+  "24": [
+   10
+  ],
+  "25": [
+   6
+  ],
+  "41": [
+   1,
+   4,
+   5,
+   8,
+   12
+  ],
+  "42": [
+   1,
+   8,
+   12
+  ],
+  "43": [
+   4,
+   8,
+   12
+  ],
+  "44": [
+   1,
+   2,
+   5,
+   8,
+   12
+  ],
+  "45": [
+   1,
+   3,
+   5,
+   8
+  ],
+  "46": [
+   1,
+   3,
+   12,
+   8
+  ],
+  "47": [
+   2,
+   8
+  ],
+  "51": [
+   1,
+   3,
+   5,
+   8
+  ],
+  "52": [
+   4,
+   8
+  ],
+  "53": [
+   2,
+   8
+  ],
+  "54": [
+   4,
+   8
+  ],
+  "55": [
+   1,
+   5,
+   8
+  ],
+  "56": [
+   1,
+   3,
+   8,
+   11,
+   12
+  ],
+  "57": [
+   4,
+   8
+  ],
+  "58": [
+   1,
+   2,
+   8
+  ],
+  "59": [
+   1,
+   3,
+   12,
+   8
+  ],
+  "60": [
+   1,
+   3,
+   8,
+   12
+  ],
+  "61": [
+   8,
+   13
+  ],
+  "62": [
+   1,
+   2,
+   3,
+   5,
+   8,
+   12
+  ],
+  "63": [
+   12,
+   13
+  ],
+  "64": [
+   1,
+   2,
+   3,
+   5,
+   8,
+   12
+  ],
+  "65": [
+   12,
+   13
+  ],
+  "66": [
+   1,
+   3,
+   8,
+   11
+  ],
+  "67": [
+   1,
+   3,
+   8,
+   11
+  ],
+  "68": [
+   1,
+   3,
+   8,
+   11
+  ],
+  "69": [
+   7
+  ],
+  "70": [
+   7
+  ],
+  "71": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   8,
+   12
+  ],
+  "72": [
+   1,
+   4,
+   5,
+   8,
+   12
+  ],
+  "73": [
+   2,
+   8
+  ],
+  "74": [
+   1,
+   4,
+   5,
+   8
+  ],
+  "75": [
+   14
+  ],
+  "85": [
+   6
+  ]
+ }
+}

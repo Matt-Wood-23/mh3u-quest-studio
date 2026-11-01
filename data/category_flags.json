@@ -1,0 +1,393 @@
+{
+ "_source": "rQuestData.Category (u64, file bytes after MainZako; live +0x1E0, low word +0x1E4). Counts over the 413 US base quests.",
+ "hp_cut": {
+  "mask": "0x00100010",
+  "factor": 0.55,
+  "note": "applied after the Nando HP multiplier unless sGame+0x1B9 == 1 (every static store writes 0)"
+ },
+ "bits": [
+  {
+   "bit": 0,
+   "mask": "0x00000001",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 312,
+   "examples": [
+    "#01102 Farm Aid",
+    "#01202 Bug Hunt",
+    "#01203 My Lord's Errand",
+    "#02201 No Love for Ludroth"
+   ]
+  },
+  {
+   "bit": 1,
+   "mask": "0x00000002",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 68,
+   "examples": [
+    "#00001 Tutorial 1",
+    "#00002 Tutorial 2",
+    "#00004 Tutorial 4",
+    "#00101 Tutorial 1"
+   ]
+  },
+  {
+   "bit": 2,
+   "mask": "0x00000004",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 274,
+   "examples": [
+    "#01203 My Lord's Errand",
+    "#01204 Bear Trap",
+    "#01206 Who's the Boss?",
+    "#01205 Pain in the Plains"
+   ]
+  },
+  {
+   "bit": 3,
+   "mask": "0x00000008",
+   "name": "Shakalaka Savior I/II only",
+   "confirmed": false,
+   "evidence": null,
+   "count": 2,
+   "examples": [
+    "#02301 Shakalaka Savior",
+    "#02503 Shakalaka Savior II"
+   ]
+  },
+  {
+   "bit": 4,
+   "mask": "0x00000010",
+   "name": "Monster HP x0.55 (challenge/arena quests)",
+   "confirmed": true,
+   "evidence": "uEnemy::setMaxHp 0x0259FB84 via 0x021691E8; all 23 Grudge Match / Challenge quests set it",
+   "count": 23,
+   "examples": [
+    "#60000 Grudge Match: Lagombi",
+    "#60001 Grudge Match: Purple Ludroth",
+    "#60002 Grudge Match: Barioth",
+    "#60003 Grudge Match: Plesioth"
+   ]
+  },
+  {
+   "bit": 5,
+   "mask": "0x00000020",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 6,
+   "mask": "0x00000040",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 12,
+   "examples": [
+    "#11609 Sweltering Showdown",
+    "#11610 Bad, White, and Blue",
+    "#11814 Operation: Last Stand",
+    "#11812 Tundra Trump Cards"
+   ]
+  },
+  {
+   "bit": 7,
+   "mask": "0x00000080",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 3,
+   "examples": [
+    "#01614 Siren's Song",
+    "#20323 Motley Crew",
+    "#20324 The Greatest Hunter"
+   ]
+  },
+  {
+   "bit": 8,
+   "mask": "0x00000100",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 9,
+   "mask": "0x00000200",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 10,
+   "mask": "0x00000400",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 11,
+   "mask": "0x00000800",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 12,
+   "mask": "0x00001000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 13,
+   "mask": "0x00002000",
+   "name": "Harvest Tour (free gathering) quests",
+   "confirmed": false,
+   "evidence": null,
+   "count": 26,
+   "examples": [
+    "#01201 Harvest Tour: Sandy Plains",
+    "#01301 Harvest Tour: Flooded Forest",
+    "#01401 Harvest Tour: Tundra",
+    "#01501 Harvest Tour: Volcano"
+   ]
+  },
+  {
+   "bit": 14,
+   "mask": "0x00004000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 15,
+   "mask": "0x00008000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 16,
+   "mask": "0x00010000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 286,
+   "examples": [
+    "#00001 Tutorial 1",
+    "#00002 Tutorial 2",
+    "#00004 Tutorial 4",
+    "#00101 Tutorial 1"
+   ]
+  },
+  {
+   "bit": 17,
+   "mask": "0x00020000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 127,
+   "examples": [
+    "#00310 Moga (Night) Quest 1",
+    "#00311 Moga (Night) Quest 2",
+    "#00312 Moga (Night) Quest 3",
+    "#00313 Moga (Night) Quest 4"
+   ]
+  },
+  {
+   "bit": 18,
+   "mask": "0x00040000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 19,
+   "mask": "0x00080000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 74,
+   "examples": [
+    "#01617 Herd Mentality",
+    "#01618 Desert Warfare",
+    "#01614 Siren's Song",
+    "#01708 Toxin Avenger"
+   ]
+  },
+  {
+   "bit": 20,
+   "mask": "0x00100000",
+   "name": "Monster HP x0.55",
+   "confirmed": true,
+   "evidence": "uEnemy::setMaxHp 0x0259FB84 via 0x02169178; unused by base quests",
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 21,
+   "mask": "0x00200000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 2,
+   "examples": [
+    "#02402 Trial of the Sea Dragon",
+    "#02502 Save Moga Village!"
+   ]
+  },
+  {
+   "bit": 22,
+   "mask": "0x00400000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 23,
+   "mask": "0x00800000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 11,
+   "examples": [
+    "#01101 Harvest 'Shroom",
+    "#01102 Farm Aid",
+    "#01103 Guts: It's What's for Dinner",
+    "#01204 Bear Trap"
+   ]
+  },
+  {
+   "bit": 24,
+   "mask": "0x01000000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 37,
+   "examples": [
+    "#00001 Tutorial 1",
+    "#00002 Tutorial 2",
+    "#00004 Tutorial 4",
+    "#00101 Tutorial 1"
+   ]
+  },
+  {
+   "bit": 25,
+   "mask": "0x02000000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 75,
+   "examples": [
+    "#01403 Hunter Killer",
+    "#01615 Double Jeopardy",
+    "#01711 Rockslide",
+    "#01710 On Thin Ice"
+   ]
+  },
+  {
+   "bit": 26,
+   "mask": "0x04000000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 46,
+   "examples": [
+    "#01708 Toxin Avenger",
+    "#01811 [Canteen] The Endless Hunt",
+    "#01812 Clobberin' Time!",
+    "#01912 Triple Threat"
+   ]
+  },
+  {
+   "bit": 27,
+   "mask": "0x08000000",
+   "name": "Grudge Match / Challenge quests (always with 0x10)",
+   "confirmed": false,
+   "evidence": null,
+   "count": 23,
+   "examples": [
+    "#60000 Grudge Match: Lagombi",
+    "#60001 Grudge Match: Purple Ludroth",
+    "#60002 Grudge Match: Barioth",
+    "#60003 Grudge Match: Plesioth"
+   ]
+  },
+  {
+   "bit": 28,
+   "mask": "0x10000000",
+   "name": "Jhen Mohran desert-ship quests",
+   "confirmed": false,
+   "evidence": null,
+   "count": 6,
+   "examples": [
+    "#01712 Rumble in the Great Desert",
+    "#11510 [Canteen] Desert Rumble!",
+    "#11823 Festival on the Sea of Sand",
+    "#20301 DUMMY"
+   ]
+  },
+  {
+   "bit": 29,
+   "mask": "0x20000000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 40,
+   "examples": [
+    "#01201 Harvest Tour: Sandy Plains",
+    "#01207 Secret of the Crystal Bones",
+    "#01208 No Guts, No Glory",
+    "#01301 Harvest Tour: Flooded Forest"
+   ]
+  },
+  {
+   "bit": 30,
+   "mask": "0x40000000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 0,
+   "examples": []
+  },
+  {
+   "bit": 31,
+   "mask": "0x80000000",
+   "name": null,
+   "confirmed": false,
+   "evidence": null,
+   "count": 12,
+   "examples": [
+    "#01617 Herd Mentality",
+    "#01618 Desert Warfare",
+    "#01709 The Write Stuff",
+    "#11658 [Advanced] Peak Performers"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+# per-user state
+studio_config.json
+workspace/
+# never commit game files
+*.arc
+*.arc.orig
+*.quest
+*.BACKUP
+quest1
+quest2
+quest3
+quest4
+dist/
