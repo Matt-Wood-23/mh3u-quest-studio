@@ -69,34 +69,105 @@ def default_region(content):
     return "us" if "us" in regions else (regions[0] if regions else None)
 
 
-def cemu_mlc_dirs():
-    """mlc01 folders of the usual Cemu installs (settings.xml mlc_path or the
-    default %APPDATA%/Cemu/mlc01)."""
+def _mlc_from_settings(settings_xml):
+    try:
+        txt = Path(settings_xml).read_text(encoding="utf8", errors="replace")
+    except OSError:
+        return None
+    m = re.search(r"<mlc_path>([^<]+)</mlc_path>", txt)
+    return Path(m.group(1).strip()) if m and m.group(1).strip() else None
+
+
+def mlc_of_cemu_dir(cemu_dir):
+    """mlc01 folder of a Cemu install folder (portable or not)."""
+    d = Path(cemu_dir)
+    for s in (d / "portable" / "settings.xml", d / "settings.xml"):
+        m = _mlc_from_settings(s)
+        if m and (m / "usr").is_dir():
+            return m
+    for c in (d / "portable" / "mlc01", d / "mlc01"):
+        if (c / "usr").is_dir():
+            return c
+    return None
+
+
+def running_cemu_dirs():
+    """Folders of running Cemu*.exe processes, which finds portable installs
+    (Windows only, no extra modules)."""
+    if os.name != "nt":
+        return []
+    import ctypes
+    from ctypes import wintypes
+    try:
+        psapi, k32 = ctypes.WinDLL("psapi"), ctypes.WinDLL("kernel32")
+    except OSError:
+        return []
+    pids = (wintypes.DWORD * 8192)()
+    got = wintypes.DWORD()
+    if not psapi.EnumProcesses(pids, ctypes.sizeof(pids), ctypes.byref(got)):
+        return []
+    out = []
+    for pid in pids[:got.value // ctypes.sizeof(wintypes.DWORD)]:
+        h = k32.OpenProcess(0x1000, False, pid)   # QUERY_LIMITED_INFORMATION
+        if not h:
+            continue
+        try:
+            buf = ctypes.create_unicode_buffer(1024)
+            n = wintypes.DWORD(1024)
+            if k32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(n)):
+                exe = Path(buf.value)
+                if exe.name.lower().startswith("cemu") and exe.suffix.lower() == ".exe":
+                    out.append(exe.parent)
+        finally:
+            k32.CloseHandle(h)
+    return out
+
+
+def cemu_mlc_dirs(cemu_dirs=(), game_dirs=()):
+    """mlc01 folders to look in: the default install (%APPDATA%/Cemu), any
+    running Cemu, Cemu folders the user added, and the mlc01 a configured
+    game folder lives in."""
     out = []
     appdata = os.environ.get("APPDATA")
     if appdata:
         cemu = Path(appdata) / "Cemu"
-        try:
-            txt = (cemu / "settings.xml").read_text(encoding="utf8",
-                                                    errors="replace")
-            m = re.search(r"<mlc_path>([^<]+)</mlc_path>", txt)
-            if m and m.group(1).strip():
-                out.append(Path(m.group(1).strip()))
-        except OSError:
-            pass
+        m = _mlc_from_settings(cemu / "settings.xml")
+        if m:
+            out.append(m)
         out.append(cemu / "mlc01")
+    for d in list(running_cemu_dirs()) + [Path(c) for c in cemu_dirs]:
+        m = mlc_of_cemu_dir(d)
+        if m:
+            out.append(m)
+    for g in game_dirs:
+        for p in Path(g).parents:
+            if (p / "usr" / "title").is_dir() and (p / "usr" / "save").is_dir():
+                out.append(p)
+                break
     seen, res = set(), []
     for p in out:
-        if p.is_dir() and str(p).lower() not in seen:
-            seen.add(str(p).lower())
+        key = str(p.resolve()).lower() if p.exists() else None
+        if key and p.is_dir() and key not in seen:
+            seen.add(key)
             res.append(p)
     return res
 
 
-def detect_game_dirs():
-    """MH3U titles installed into Cemu's mlc01 (US/EU/JP)."""
+def install_label(mlc):
+    """Short name for a Cemu install from its mlc01 path."""
+    d = Path(mlc).parent
+    if d.name.lower() == "portable":
+        d = d.parent
+    appdata = os.environ.get("APPDATA")
+    if appdata and str(d).lower() == str(Path(appdata) / "Cemu").lower():
+        return "Cemu (default install)"
+    return str(d)
+
+
+def detect_game_dirs(cemu_dirs=()):
+    """MH3U titles installed into a Cemu mlc01 (US/EU/JP)."""
     found = []
-    for mlc in cemu_mlc_dirs():
+    for mlc in cemu_mlc_dirs(cemu_dirs):
         for tid in TITLE_REGIONS:
             c = mlc / "usr" / "title" / "00050000" / tid / "content"
             if (c / "nativeCafe" / "arc" / "quest").is_dir():
@@ -104,14 +175,16 @@ def detect_game_dirs():
     return found
 
 
-def cemu_save_dirs():
-    """Folders holding the DLC quest packs (quest1..quest4)."""
+def cemu_save_dirs(cemu_dirs=(), game_dirs=()):
+    """[(install label, region, user folder)] for every save folder holding
+    event quest packs (quest1..quest4)."""
     out = []
-    for mlc in cemu_mlc_dirs():
-        for tid in TITLE_REGIONS:
+    for mlc in cemu_mlc_dirs(cemu_dirs, game_dirs):
+        for tid, region in TITLE_REGIONS.items():
             base = mlc / "usr" / "save" / "00050000" / tid / "user"
             if base.is_dir():
-                out += [d for d in sorted(base.iterdir())
+                out += [(install_label(mlc), region.upper(), d)
+                        for d in sorted(base.iterdir())
                         if d.is_dir() and (d / "quest1").exists()]
     return out
 
@@ -124,6 +197,7 @@ class Config:
         self.game_dirs = []
         self.region = None
         self.workspace = None
+        self.cemu_dirs = []      # extra (portable) Cemu folders for save packs
         if self.path.exists():
             try:
                 j = json.loads(self.path.read_text(encoding="utf8"))
@@ -132,12 +206,14 @@ class Config:
             self.game_dirs = [Path(p) for p in j.get("game_dirs", [])]
             self.region = j.get("region")
             self.workspace = j.get("workspace")
+            self.cemu_dirs = [Path(p) for p in j.get("cemu_dirs", [])]
 
     def save(self):
         self.path.write_text(json.dumps({
             "game_dirs": [str(p) for p in self.game_dirs],
             "region": self.region,
             "workspace": self.workspace,
+            "cemu_dirs": [str(p) for p in self.cemu_dirs],
         }, indent=2), encoding="utf8")
 
 

@@ -562,7 +562,7 @@ class QuestEditor(ttk.Frame):
                               values=MON_CHOICES)
             cb.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 4))
             cb.bind("<<ComboboxSelected>>",
-                    lambda e, s=slot: self._refresh_stats(s))
+                    lambda e, s=slot: self._monster_picked(s))
             ttk.Button(lf_, text="Copy from quest…",
                        command=lambda s=slot: self._copy_from(s)).grid(
                 row=0, column=3, columnspan=2, sticky="w", padx=4)
@@ -711,6 +711,38 @@ class QuestEditor(ttk.Frame):
         for f, _ in MON_UI:
             row[f].delete(0, "end")
             row[f].insert(0, str(m[f]) if m["Type"] else "0")
+        self._refresh_stats(slot)
+
+    def _monster_picked(self, slot):
+        """A monster chosen for a slot with no numbers yet (count 0) gets
+        usable defaults instead of all zeros (count 0 = never spawns,
+        size 0)."""
+        row = self.mon[slot]
+        try:
+            count = int(row["Num"].get() or 0)
+        except ValueError:
+            count = 0
+        if row["var"].get() != EMPTY and count == 0:
+            rows = (30, 30, 30)
+            for other in self.mon:
+                if other is row or other["var"].get() == EMPTY:
+                    continue
+                try:
+                    vals = tuple(int(other[f].get()) for f in NANDO_FIELDS)
+                    if int(other["Num"].get() or 0) > 0:
+                        rows = vals
+                        break
+                except ValueError:
+                    pass
+            defaults = dict(zip(NANDO_FIELDS, rows), Num=1, Size=100)
+            for f, _ in MON_UI:
+                row[f].delete(0, "end")
+                row[f].insert(0, str(defaults.get(f, 0)))
+            self.msg.config(text=f"Monster {slot + 1}: filled in count 1, "
+                                 f"size 100 and the difficulty rows of the "
+                                 f"quest's other monster. Copy from quest… "
+                                 f"gives the game's own values.",
+                            foreground=MUTED)
         self._refresh_stats(slot)
 
     def _clear_slot(self, slot):
@@ -915,9 +947,17 @@ class QuestEditor(ttk.Frame):
 
     def warnings(self, data):
         q = Quest(data)
-        return GD.legality_warnings(
+        out = GD.legality_warnings(
             [(i, m["Type"]) for i, m in enumerate(q.monsters) if m["Type"]],
             q.get("map"))
+        for i, m in enumerate(q.monsters):
+            if m["Type"] and m["Num"] == 0:
+                out.append(f"monster {i + 1}: {GD.mon_name(m['Type'])} has "
+                           f"count 0, so it won't appear")
+            elif m["Type"] and m["Size"] == 0:
+                out.append(f"monster {i + 1}: {GD.mon_name(m['Type'])} has "
+                           f"size 0%")
+        return out
 
     def save(self):
         if not self.q:
@@ -929,10 +969,11 @@ class QuestEditor(ttk.Frame):
             return
         warns = self.warnings(data)
         if warns and not messagebox.askyesno(
-                "Monster / map mismatch",
-                "The game has no spawn data for:\n\n" + "\n".join(warns) +
-                "\n\nMonster 1 without spawn data crashes the game when the "
-                "quest loads. Save anyway?", icon="warning", parent=self):
+                "Check before saving",
+                "Possible problems:\n\n" + "\n".join(f"• {w}" for w in warns) +
+                "\n\n(A monster 1 with no spawn data for the map crashes the "
+                "game when the quest loads.)\n\nSave anyway?",
+                icon="warning", parent=self):
             return
         if self.on_save(data):
             self.q = Quest(data)

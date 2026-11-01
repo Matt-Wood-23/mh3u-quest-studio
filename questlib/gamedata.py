@@ -160,7 +160,7 @@ def legality_warnings(monsters, quest_map):
         if em_id and stage_legal(em_id, quest_map) is False:
             sev = ("WILL CRASH at quest load" if slot == 0
                    else "may crash or misbehave")
-            out.append(f"slot {slot + 1}: {mon_name(em_id)} has no spawn "
+            out.append(f"monster {slot + 1}: {mon_name(em_id)} has no spawn "
                        f"data for {map_name(quest_map)} — {sev}")
     return out
 

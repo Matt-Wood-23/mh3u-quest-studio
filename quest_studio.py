@@ -93,7 +93,7 @@ class SetupDialog(tk.Toplevel):
             side="left")
         ttk.Button(bf, text="Remove", command=self._remove).pack(
             side="left", padx=4)
-        self.det = P.detect_game_dirs()
+        self.det = P.detect_game_dirs(cfg.cemu_dirs)
         if self.det:
             ttk.Button(bf, text="Add detected Cemu install",
                        command=self._add_detected).pack(side="left", padx=4)
@@ -483,9 +483,9 @@ class DlcTab(ttk.Frame):
         self.quick = ttk.Menubutton(bar, text="Cemu save packs")
         self.quick.pack(side="left", padx=8)
         self.quick_menu = tk.Menu(self.quick, tearoff=False,
-                                  bg=TK_DARK["bg"], fg=TK_DARK["fg"])
+                                  bg=TK_DARK["bg"], fg=TK_DARK["fg"],
+                                  postcommand=self._fill_quick)
         self.quick["menu"] = self.quick_menu
-        self._fill_quick()
         ttk.Button(bar, text="Restore pack backup",
                    command=self.restore_backup).pack(side="right", padx=2)
         ttk.Button(bar, text="Delete quest",
@@ -526,24 +526,56 @@ class DlcTab(ttk.Frame):
             revert_label="Undo unsaved changes")
         paned.add(self.editor, weight=3)
 
+    def _save_dirs(self):
+        cfg = self.app.cfg
+        return P.cemu_save_dirs(cfg.cemu_dirs, cfg.game_dirs)
+
     def _fill_quick(self):
-        self.quick_menu.delete(0, "end")
-        dirs = P.cemu_save_dirs()
-        for d in dirs:
+        """Rebuilt each time the menu opens, so a Cemu started after Quest
+        Studio (e.g. a portable copy) shows up too."""
+        m = self.quick_menu
+        m.delete(0, "end")
+        found = self._save_dirs()
+        last = None
+        for label, region, d in found:
+            if label != last:
+                if last is not None:
+                    m.add_separator()
+                m.add_command(label=label, state="disabled")
+                last = label
             for n in ("quest1", "quest2", "quest3", "quest4"):
                 if (d / n).exists():
-                    self.quick_menu.add_command(
-                        label=f"{d.parent.parent.name}/{d.name}/{n}",
+                    m.add_command(
+                        label=f"    {region} save {d.name}  ›  {n}",
                         command=lambda p=d / n: self._open(DlcPack, p))
-        if not dirs:
-            self.quick_menu.add_command(label="(no Cemu save folder found)",
-                                        state="disabled")
+        if not found:
+            m.add_command(label="(no Cemu save folder found)",
+                          state="disabled")
+        m.add_separator()
+        m.add_command(label="Add a Cemu folder…", command=self._add_cemu)
+
+    def _add_cemu(self):
+        d = filedialog.askdirectory(title="Cemu folder (the one with "
+                                          "Cemu.exe in it)")
+        if not d:
+            return
+        if P.mlc_of_cemu_dir(d) is None:
+            messagebox.showerror("Not a Cemu folder", f"{d}\n\nhas no mlc01 "
+                                 "folder (looked in mlc01 and portable\\mlc01)."
+                                 " Start that Cemu once, then try again.")
+            return
+        cfg = self.app.cfg
+        if str(Path(d)).lower() not in (str(p).lower() for p in cfg.cemu_dirs):
+            cfg.cemu_dirs.append(Path(d))
+            cfg.save()
+        self.app.status(f"Added Cemu folder {d}; its save packs are now in "
+                        f"the 'Cemu save packs' menu.")
 
     def open_pack(self):
-        dirs = P.cemu_save_dirs()
+        dirs = self._save_dirs()
         path = filedialog.askopenfilename(
             title="Open quest pack (quest1..quest4)",
-            initialdir=str(dirs[0]) if dirs else None)
+            initialdir=str(dirs[0][2]) if dirs else None)
         if path:
             self._open(DlcPack, path)
 

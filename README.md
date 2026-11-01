@@ -57,7 +57,7 @@ Values above 127 run past the end of the table, so the editor refuses them.
 
 ## Editing DLC / event quests
 
-Open a pack from **Cemu save packs** (or **Open pack…**). Edit a quest and click **Save quest**. The pack file is written straight away, and a `.BACKUP` copy is made the first time. Close the game before saving.
+Open a pack from **Cemu save packs** (or **Open pack…**). The menu lists the packs of every Cemu it can find (the default install and any Cemu that's running), grouped by install folder. Pick the install you actually play on, since each Cemu has its own saves. A portable Cemu that isn't running can be added with **Add a Cemu folder…**. Edit a quest and click **Save quest**. The pack file is written straight away, and a `.BACKUP` copy is made the first time. Close the game before saving.
 
 ![DLC tab with an event pack open](docs/studio_dlc.png)
 
