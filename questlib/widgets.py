@@ -22,24 +22,29 @@ SETTINGS_FIELDS = [
      "the game's own quests use reward ÷ 3"),
     ("main_hrp", "HR points", 0, 999_999, ""),
     ("failure_hrp", "HR points on failure", 0, 999_999, ""),
-    ("item_set_no", "Supply crate (ItemSetNo)", 0, 294,
+    ("supp_set_no", "Supply crate (SuppSetNo)", 0, 294,
      "picks quest/support/suppNNN.supp"),
 ]
+# Capcom's names; the hints give the values the game's own quests use.
 ADVANCED_FIELDS = [
     ("quest_no", "Quest number", 0, 65535,
      "leave as is: the quest board finds quests by this number"),
-    ("supp_set_no", "Supply delivery mode", 0, 3, ""),
-    ("supp_time_flag", "Supply time flag", 0, 65535, ""),
-    ("start_param", "Start param", 0, 65535, ""),
-    ("demo_no", "Intro cutscene (DemoNo)", 0, 255, ""),
-    ("special_flag", "SpecialFlag", 0, 65535,
-     "hub rank gate / arena loadout (challenge quests use 9-27)"),
-    ("special_cond", "SpecialCondition", 0, 65535, ""),
-    ("special_cond2", "SpecialCondition2", 0, 65535, ""),
+    ("demo_no", "Intro cutscene (DemoNo)", 0, 255,
+     "0 = none; only key quests set one"),
+    ("supp_time_flag", "SuppTimeFlag", 0, 65535, "0–3 in the game's quests"),
+    ("start_param", "StartParam", 0, 65535, "0–2 in the game's quests"),
+    ("ren_pattern", "Ren_pattern", 0, 65535, "0–8 in the game's quests"),
+    ("rannyu_limite", "Rannyu_limite (intrusion limit)", 0, 65535,
+     "0 in every base quest"),
+    ("enemy_lv", "EnemyLv", 0, 255, "0–4 in the game's quests"),
+    ("hagi_no", "HagiNo", 0, 255, "0–4 in the game's quests"),
 ]
 FIELD_RANGES = {f: (lo, hi) for f, _, lo, hi, _ in
                 SETTINGS_FIELDS + ADVANCED_FIELDS}
-FIELD_RANGES.update({"obj1_num": (0, 32767), "obj2_num": (0, 32767),
+FIELD_RANGES.update({"special_flag": (0, 65535),
+                     "special_cond": (0, GD.COND_COUNT - 1),
+                     "special_cond2": (0, GD.COND_COUNT - 1),
+                     "obj1_num": (0, 32767), "obj2_num": (0, 32767),
                      "obj1_id": (0, 65535), "obj2_id": (0, 65535),
                      "obj1_param": (0, 0xFFFFFFFF), "obj2_param": (0, 0xFFFFFFFF)})
 
@@ -58,8 +63,25 @@ MON_HELP = (
     "Easiest way to add a monster: Copy from quest… (pick one on the same map "
     "at a similar rank).")
 
+JOIN_HELP = (
+    "The rules are what the game checks, when the quest is started and when "
+    "someone joins online. The board text is only what players read, so it "
+    "follows the rules: changing a rule picks the matching text. Values 1–11 "
+    "are unused by Capcom: the host can start the quest but nobody can join "
+    "it online.")
+
 EMPTY = "(empty)"
 MON_CHOICES = [EMPTY] + [f"{i:3d}  {n}" for i, n in sorted(GD.MONSTERS.items())]
+COND_CHOICES = [f"{v}  {GD.cond_name(v)}" for v in range(GD.COND_COUNT)]
+REQ_CHOICES = [f"{f}  {t}" for f, t in enumerate(GD.REQ_TEXT)]
+
+
+def cond_choice(v):
+    return f"{v}  {GD.cond_name(v)}"
+
+
+def req_choice(f):
+    return f"{f}  {GD.req_text(f)}"
 OBJ_CHOICES = [f"0x{k:X}  {v}" for k, v in OBJ_TYPES.items()]
 MONSTER_OBJ_TYPES = {0x1, 0x81, 0x101, 0x8101, 0x404, 0x2515, 0x4014}
 
@@ -497,7 +519,7 @@ class QuestEditor(ttk.Frame):
                                    justify="left")
         self.crate_lbl.grid(row=len(SETTINGS_FIELDS) + 1, column=0,
                             columnspan=3, sticky="w", pady=(4, 0))
-        self.ent["item_set_no"].bind("<KeyRelease>",
+        self.ent["supp_set_no"].bind("<KeyRelease>",
                                      lambda e: self._update_crate())
 
         o = ttk.LabelFrame(tab, text="Objective (what clears the quest)",
@@ -540,6 +562,32 @@ class QuestEditor(ttk.Frame):
                        "the quest can't be completed. Deliver targets are "
                        "item ids.").grid(row=6, column=0, columnspan=5,
                                          sticky="w", pady=(4, 0))
+
+        j = ttk.LabelFrame(tab, text="Who can join", padding=8)
+        j.pack(fill="x", pady=6)
+        self.cond_vars = []
+        for i, label in enumerate(("Rule 1", "Rule 2")):
+            ttk.Label(j, text=label).grid(row=i, column=0, sticky="w", pady=2,
+                                          padx=(0, 8))
+            v = tk.StringVar()
+            cb = ttk.Combobox(j, textvariable=v, width=30, state="readonly",
+                              values=COND_CHOICES)
+            cb.grid(row=i, column=1, sticky="w", pady=2)
+            cb.bind("<<ComboboxSelected>>", lambda e: self._rules_changed())
+            self.cond_vars.append(v)
+        ttk.Label(j, text="Board text").grid(row=2, column=0, sticky="w",
+                                             pady=2, padx=(0, 8))
+        self.req_var = tk.StringVar()
+        rcb = ttk.Combobox(j, textvariable=self.req_var, width=62,
+                           state="readonly", values=REQ_CHOICES)
+        rcb.grid(row=2, column=1, sticky="w", pady=2)
+        rcb.bind("<<ComboboxSelected>>", lambda e: self._update_join())
+        self.join_lbl = ttk.Label(j, wraplength=560, justify="left")
+        self.join_lbl.grid(row=3, column=0, columnspan=2, sticky="w",
+                           pady=(4, 0))
+        ttk.Label(j, foreground=MUTED, wraplength=560, justify="left",
+                  text=JOIN_HELP).grid(row=4, column=0, columnspan=2,
+                                       sticky="w", pady=(4, 0))
 
         a = ttk.LabelFrame(tab, text="Advanced", padding=8)
         a.pack(fill="x", pady=6)
@@ -657,6 +705,9 @@ class QuestEditor(ttk.Frame):
         self.map_var.set(f"{m}  {GD.map_name(m)}")
         c = q.get("clr_pattern")
         self.clr_var.set(f"{c}  {CLR_PATTERNS.get(c, '?')}")
+        self.cond_vars[0].set(cond_choice(q.get("special_cond")))
+        self.cond_vars[1].set(cond_choice(q.get("special_cond2")))
+        self.req_var.set(req_choice(q.get("special_flag")))
         for k in ("obj1", "obj2"):
             p = q.get(f"{k}_param")
             t = p & 0xFFFF
@@ -679,6 +730,7 @@ class QuestEditor(ttk.Frame):
         self._loading = False
         self._update_crate()
         self._update_objective()
+        self._update_join()
         self._refresh_all_stats()
         self.set_enabled(True)
         self.msg.config(text="")
@@ -804,7 +856,7 @@ class QuestEditor(ttk.Frame):
 
     def _update_crate(self):
         try:
-            no = int(self.ent["item_set_no"].get(), 0)
+            no = int(self.ent["supp_set_no"].get(), 0)
         except ValueError:
             self.crate_lbl.config(text="")
             return
@@ -873,6 +925,43 @@ class QuestEditor(ttk.Frame):
                 if commit:
                     self.loaded_text[f] = cur
 
+    def _join_values(self):
+        """(board text, rule 1, rule 2) as shown; raises ValueError."""
+        return (parse_int(self.req_var.get(), "Board text"),
+                parse_int(self.cond_vars[0].get(), "Rule 1"),
+                parse_int(self.cond_vars[1].get(), "Rule 2"))
+
+    def _rules_changed(self):
+        """A rule changed: switch the board text to one that describes it."""
+        try:
+            flag, c1, c2 = self._join_values()
+        except ValueError:
+            return
+        best = GD.text_for_rules((c1, c2), flag)
+        if best is not None and best != flag:
+            self.req_var.set(req_choice(best))
+        self._update_join()
+
+    def _update_join(self):
+        try:
+            problems = GD.requirement_problems(*self._join_values())
+        except ValueError:
+            problems = []
+        if problems:
+            self.join_lbl.config(text="\n".join(p[0].upper() + p[1:] + "."
+                                                for p in problems),
+                                 foreground=ERR_FG)
+        else:
+            self.join_lbl.config(text="Board text matches the rules.",
+                                 foreground=OK_FG)
+
+    def _apply_join(self, q):
+        for f, v in zip(("special_flag", "special_cond", "special_cond2"),
+                        self._join_values()):
+            check_range(f, v)
+            if v != q.get(f):
+                q.set(f, v)
+
     def _apply_objective(self, q):
         q.set("clr_pattern", parse_int(self.clr_var.get(), "Combine"))
         for k, o in self.obj.items():
@@ -899,6 +988,7 @@ class QuestEditor(ttk.Frame):
         if m != q.get("map"):
             q.set("map", m)
         self._apply_objective(q)
+        self._apply_join(q)
         for slot, row in enumerate(self.mon):
             sel = row["var"].get().strip()
             if sel == EMPTY or not sel:
@@ -947,6 +1037,10 @@ class QuestEditor(ttk.Frame):
 
     def warnings(self, data):
         q = Quest(data)
+        return self._monster_warnings(q) + GD.requirement_problems(
+            q.get("special_flag"), q.get("special_cond"), q.get("special_cond2"))
+
+    def _monster_warnings(self, q):
         out = GD.legality_warnings(
             [(i, m["Type"]) for i, m in enumerate(q.monsters) if m["Type"]],
             q.get("map"))
@@ -968,11 +1062,13 @@ class QuestEditor(ttk.Frame):
             messagebox.showerror("Can't save", str(e), parent=self)
             return
         warns = self.warnings(data)
+        note = ("\n\n(A monster 1 with no spawn data for the map crashes the "
+                "game when the quest loads.)"
+                if self._monster_warnings(Quest(data)) else "")
         if warns and not messagebox.askyesno(
                 "Check before saving",
                 "Possible problems:\n\n" + "\n".join(f"• {w}" for w in warns) +
-                "\n\n(A monster 1 with no spawn data for the map crashes the "
-                "game when the quest loads.)\n\nSave anyway?",
+                note + "\n\nSave anyway?",
                 icon="warning", parent=self):
             return
         if self.on_save(data):

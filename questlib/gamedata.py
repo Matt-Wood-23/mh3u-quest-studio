@@ -167,16 +167,120 @@ def legality_warnings(monsters, quest_map):
 
 # --------------------------------------------------------- supply crate
 
-def supp_set_summary(item_set_no):
+def supp_set_summary(supp_set_no):
     """Start-of-quest supply crate (quest/support/suppNNN.supp)."""
-    if item_set_no == 0:
+    if supp_set_no == 0:
         return "(no supply crate)"
-    items = SUPP_SETS.get(item_set_no)
+    items = SUPP_SETS.get(supp_set_no)
     if items is None:
-        return f"(no supp{item_set_no:03d}.supp in the game)"
+        return f"(no supp{supp_set_no:03d}.supp in the game)"
     seen, order = set(), []
     for iid, qty in items:          # collapse the per-hunter duplicates
         if (iid, qty) not in seen:
             seen.add((iid, qty))
             order.append((iid, qty))
     return ", ".join(f"{item_name(i)} x{q}" for i, q in order) or "(empty)"
+
+
+# ------------------------------------------------- who can join a quest
+# SpecialFlag only picks the line the quest board shows (the game's Quest
+# message 42 + flag; 28 and up shows nothing). SpecialCondition and
+# SpecialCondition2 are the rules the game checks, when the quest is started
+# and when someone joins online: both index a 24-entry table (0x101C55F0).
+
+Req = namedtuple("Req", "hr players naked")
+NO_REQ = Req(None, 4, False)
+COND_COUNT = 24
+
+REQ_TEXT = (
+    ["None."]
+    + [f"Must be HR {n} or higher to initiate/join." for n in range(1, 9)]
+    + [f"Must be HR {hr} or higher to join. Max participants: {p}"
+       for p in (1, 2, 4) for hr in (3, 6, 8)]
+    + ["Must remove all armor and talismans to initiate/join.",
+       "Must be HR 3 or higher to join. No armor or talismans.",
+       "Must be HR 6 or higher to join. No armor or talismans."]
+    + ["Must bring Cha-Cha & Kayamba."] * 2
+    + ["Must bring Cha-Cha, Kayamba & Unfortunate Mask (on Kayamba)."] * 2
+    + [f"No HR restrictions. Max participants: {p}" for p in (1, 2, 4)])
+
+# What each line claims, to compare against the rules. The Cha-Cha lines
+# claim nothing these rules can check (the game enforces those elsewhere).
+REQ_CLAIMS = (
+    [NO_REQ, NO_REQ] + [Req(n, 4, False) for n in range(2, 9)]
+    + [Req(hr, p, False) for p in (1, 2, 4) for hr in (3, 6, 8)]
+    + [Req(None, 4, True), Req(3, 4, True), Req(6, 4, True)]
+    + [NO_REQ] * 4
+    + [Req(None, p, False) for p in (1, 2, 4)])
+assert len(REQ_TEXT) == len(REQ_CLAIMS) == 28
+_NO_AUTO_TEXT = {1, 21, 22, 23, 24}   # never picked automatically
+
+
+def req_text(flag):
+    if 0 <= flag < len(REQ_TEXT):
+        return REQ_TEXT[flag]
+    return "(nothing shown)"
+
+
+def cond_name(v):
+    if v == 0:
+        return "No rule"
+    if 1 <= v <= 11:
+        return "Online players can't join"
+    if v == 12:
+        return "No armor or talismans"
+    if 13 <= v <= 15:
+        return f"Max {v - 12} player" + ("s" if v > 13 else "")
+    if 16 <= v < COND_COUNT:
+        return f"HR {v - 14} or higher"
+    return "past the end of the game's table"
+
+
+def rules_of(conds):
+    """The combined effect of the two rule values."""
+    hr = max((c - 14 for c in conds if 16 <= c < COND_COUNT), default=None)
+    players = min((c - 12 for c in conds if 13 <= c <= 15), default=4)
+    return Req(hr, players, 12 in conds)
+
+
+def describe_req(req):
+    parts = []
+    if req.hr:
+        parts.append(f"HR {req.hr}+")
+    if req.players < 4:
+        parts.append(f"max {req.players} player" +
+                     ("s" if req.players > 1 else ""))
+    if req.naked:
+        parts.append("no armor or talismans")
+    return ", ".join(parts) or "no limits"
+
+
+def text_for_rules(conds, current):
+    """The board-text value for these rules: current if it already matches,
+    else the first matching line, else None (no line describes them)."""
+    want = rules_of(conds)
+    if 0 <= current < len(REQ_CLAIMS) and REQ_CLAIMS[current] == want:
+        return current
+    return next((f for f, r in enumerate(REQ_CLAIMS)
+                 if r == want and f not in _NO_AUTO_TEXT), None)
+
+
+def requirement_problems(flag, cond1, cond2):
+    """Plain-English problems with a quest's text/rules (empty = fine)."""
+    out = []
+    for i, c in enumerate((cond1, cond2), 1):
+        if c >= COND_COUNT:
+            out.append(f"rule {i} = {c} is past the end of the game's table "
+                       f"(0–{COND_COUNT - 1}), so the game reads unrelated data")
+        elif 1 <= c <= 11:
+            out.append(f"rule {i} = {c}: nobody will be able to join this "
+                       f"quest online")
+    want = rules_of((cond1, cond2))
+    if not 0 <= flag < len(REQ_CLAIMS):
+        if want != NO_REQ:
+            out.append(f"the board shows no requirement text, but the rules "
+                       f"are: {describe_req(want)}")
+    elif REQ_CLAIMS[flag] != want:
+        out.append(f"the board says “{REQ_TEXT[flag]}” but the rules "
+                   f"are: {describe_req(want)}")
+    return out

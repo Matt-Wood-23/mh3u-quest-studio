@@ -127,7 +127,8 @@ class Quest:
             self.monsters.append(dict(zip(MON_FIELDS, d[pos:pos + MON_SIZE])))
             pos += MON_SIZE
 
-        # Nora (free-roam Moga spawn) block — DTI names, 6 x u8
+        # Nora block = invaders (DTI names, 6 x u8): SetPer != 0 = unstable,
+        # SetMax = max invaders, SetTable = invader list 0x101EBE5C[n]
         scalar("nora_set_per", "B")
         scalar("nora_per_type", "B")
         scalar("nora_set_type", "B")
@@ -150,28 +151,28 @@ class Quest:
         self.reward2 = self._parse_reward_table(pos + REWARD_SLOTS * 4)
         pos += REWARD_REGION
 
-        # money / settings / zako / objective cluster — fixed offsets from
-        # here on (matches live rQuestData 560..655, file packs out the
-        # Rannyu_limite+pad gap and the Clr_Pattern alignment pad)
+        # money / settings / zako / objective cluster: fixed offsets from
+        # here on. Names and widths follow the game's own reader (0x02076D10)
+        # and writer (0x02077354), which store into the DTI fields below.
         self._money_off = pos
-        scalar("contract", "<i")        # live 560 Contract (fee)
-        scalar("reward_money", "<i")    # live 564 Reward (zenny)
-        scalar("penalty", "<i")         # live 568 (== ceil(reward/3))
-        scalar("main_hrp", "<i")        # live 572 MainHRPoint
-        scalar("failure_hrp", "<i")     # live 576 FailureHRPoint
-        scalar("hagi_no", "<H")         # live 580 HagiNo (carve table?)
-        scalar("prog_no", "B")          # live 582
-        scalar("enemy_lv", "B")         # live 583
-        scalar("demo_no", "B")          # live 584 (intro cutscene)
-        pos += 1                        # pad
-        scalar("item_set_no", "<H")     # live 586
-        scalar("supp_set_no", "<H")     # live 588
-        scalar("supp_time_flag", "<H")  # live 590
-        scalar("supp_enemy_type", "<H") # live 592
-        scalar("supp_enemy_num", "<H")  # live 594
-        scalar("start_param", "<H")     # live 596 StartParam
-        scalar("ren_pattern", "<H")     # live 598 Ren_pattern
-        scalar("zako_ptr", "<I")        # live 604 ZakoDataPtr (0 / 0x908)
+        scalar("contract", "<i")        # Contract (fee)
+        scalar("reward_money", "<i")    # Reward (zenny)
+        scalar("penalty", "<i")         # Penalty (== ceil(reward/3))
+        scalar("main_hrp", "<i")        # MainHRPoint
+        scalar("failure_hrp", "<i")     # FailureHRPoint
+        scalar("hagi_no", "B")          # HagiNo (0-4)
+        scalar("prog_no", "B")          # ProgNo (0 except 14 quests)
+        scalar("enemy_lv", "B")         # EnemyLv (0-4)
+        scalar("demo_no", "B")          # DemoNo: intro cutscene, 0 = none
+        scalar("item_set_no", "<H")     # ItemSetNo (0 in every base quest)
+        scalar("supp_set_no", "<H")     # SuppSetNo: start crate suppNNN.supp
+        scalar("supp_time_flag", "<H")  # SuppTimeFlag (0-3)
+        scalar("supp_enemy_type", "<H") # SuppEnemyType
+        scalar("supp_enemy_num", "<H")  # SuppEnemyNum
+        scalar("start_param", "<H")     # StartParam (0-2)
+        scalar("ren_pattern", "<H")     # Ren_pattern (0-8)
+        scalar("rannyu_limite", "<H")   # Rannyu_limite (0 in every base quest)
+        scalar("zako_ptr", "<I")        # ZakoDataPtr (0 / 0x908)
         scalar("zako_nando_hp", "<I")   # live 608
         scalar("zako_nando_at", "<I")   # live 612
         scalar("zako_nando_etc", "<I")  # live 616
@@ -181,8 +182,8 @@ class Quest:
         scalar("zako_param2", "<H")     # live 626
         scalar("zako_id2", "<H")        # live 628
         scalar("zako_num2", "<H")       # live 630
-        scalar("enemybox_type", "<I")   # live 632 (0 / 0x908 in file)
-        scalar("unk_m72", "<I")         # file-only u32 (2/4/...), not in DTI
+        scalar("zako_ptr2", "<I")       # written from ZakoDataPtr again
+        scalar("enemy_box_type", "<I")  # EnemyBoxType (2-4)
         # objective records (DTI: Clr_Pattern, ClrParam/Id/Num A+B)
         scalar("clr_pattern", "<H")     # live 636: see CLR_PATTERNS
         scalar("obj1_param", "<I")      # live 640: low u16 = type, OBJ_TYPES

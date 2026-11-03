@@ -41,9 +41,11 @@ SCALARS = {  # option -> quest_format field
     "time": "time_min", "star": "star", "map": "map", "quest_no": "quest_no",
     "contract": "contract", "money": "reward_money", "penalty": "penalty",
     "hrp": "main_hrp", "failure_hrp": "failure_hrp",
-    "item_set": "item_set_no", "supp_set": "supp_set_no",
+    "crate": "supp_set_no", "demo": "demo_no",
     "supp_time_flag": "supp_time_flag", "start_param": "start_param",
-    "special_flag": "special_flag", "category": "category",
+    "ren_pattern": "ren_pattern", "rannyu_limite": "rannyu_limite",
+    "special_flag": "special_flag", "special_cond": "special_cond",
+    "special_cond2": "special_cond2", "category": "category",
     "clr_pattern": "clr_pattern",
     "obj1_type": "obj1_param", "obj1_id": "obj1_id", "obj1_num": "obj1_num",
     "obj2_type": "obj2_param", "obj2_id": "obj2_id", "obj2_num": "obj2_num",
@@ -86,9 +88,15 @@ def show(q):
     print(f"  objective: {q.objective_text(GD.mon_name, GD.item_name)}")
     print(f"  money: fee {g('contract')}z  reward {g('reward_money')}z  "
           f"penalty {g('penalty')}z  HRP {g('main_hrp')}/{g('failure_hrp')}")
-    print(f"  crate (set {g('item_set_no')}): "
-          f"{GD.supp_set_summary(g('item_set_no'))}")
+    print(f"  crate (set {g('supp_set_no')}): "
+          f"{GD.supp_set_summary(g('supp_set_no'))}")
     print(f"  category 0x{g('category'):X}: {GD.category_summary(g('category'))}")
+    c1, c2 = g("special_cond"), g("special_cond2")
+    print(f"  who can join: rules {c1} ({GD.cond_name(c1)}), {c2} "
+          f"({GD.cond_name(c2)}); board text {g('special_flag')}: "
+          f"{GD.req_text(g('special_flag'))}")
+    for p in GD.requirement_problems(g("special_flag"), c1, c2):
+        print(f"WARNING: {p}")
 
 
 def cmd_list(a):
@@ -160,6 +168,10 @@ def cmd_edit(a):
     for opt, field in SCALARS.items():
         v = getattr(a, opt)
         if v is not None:
+            if field in ("special_cond", "special_cond2") and not \
+                    0 <= v < GD.COND_COUNT:
+                raise SystemExit(f"--{opt.replace('_', '-')} must be "
+                                 f"0..{GD.COND_COUNT - 1}")
             q.set(field, v)
     for spec in a.copy_mon or []:
         parts = spec.split(":")

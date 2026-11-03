@@ -13,6 +13,7 @@ No game files are included. You need your own copy of the game.
 
 - **Text**: name, objective, description, client and failure text, in all 5 language slots or one at a time.
 - **Settings**: map, time limit, star rank, fee, reward money, HR points, starting supply crate (with a preview of what's in it).
+- **Who can join**: the rules the game enforces (HR minimum, no armor or talismans, player limit) and the requirement line shown on the quest board, which follows the rules.
 - **Objective**: hunt, capture, slay or deliver, with the target and count.
 - **Monsters**: up to 5 large monsters. Pick the species, count, size and difficulty. **Copy from quest…** clones a monster from any base quest, which is the safest way to add one.
 - **Rewards**: both reward columns, up to 32 items each.
