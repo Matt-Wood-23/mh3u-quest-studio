@@ -421,6 +421,12 @@ class QuestEditor(ttk.Frame):
         self.base = None        # bytes as loaded (for dirty checks)
         self.q = None
         self._loading = False
+        # Tk's dropdowns change their value on the mouse wheel, so scrolling
+        # the page over one silently edited the quest. Replace that class
+        # binding with a no-op: the wheel then just scrolls the page (the
+        # "all" binding in ScrollFrame), and the open list still scrolls.
+        for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            self.bind_class("TCombobox", seq, lambda e: None)
 
         self.header = ttk.Label(self, text="Select a quest",
                                 font=("TkDefaultFont", 11, "bold"))
