@@ -140,8 +140,6 @@ class Quest:
         # Reward2 (32 x 4B). Slot = [item u16][num u8][per u8]; each table's
         # live list ends at the first id==0 slot (bytes after that may be
         # stale build leftovers — preserved, never re-serialized).
-        # (Decoded 2026-07-04; replaces the old interleave+first-nonzero
-        # heuristics, which mislabeled the money cluster on ~half the corpus.)
         self._rewards_start = pos
         if pos + REWARD_REGION + 94 > len(d):
             raise QuestFormatError(

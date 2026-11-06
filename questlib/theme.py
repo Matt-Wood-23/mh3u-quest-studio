@@ -1,14 +1,10 @@
-"""Soft dark theme for MH3U tools.
-
-Palette + apply_dark_theme copied verbatim from scripts/mh3u_trainer_gui.py
-(2026-07-09 "less bright, smoother on the eyes"). Deliberately NOT imported
-from there — the trainer module drags in pymem/live-attach dependencies.
-Extended (same palette) with ttk.Treeview styling for Save Studio.
+"""Soft dark theme for the Studio: a low-contrast palette and ttk styles,
+including Treeview.
 """
-import tkinter as tk  # noqa: F401  (kept for parity with the trainer module)
+import tkinter as tk  # noqa: F401
 from tkinter import ttk
 
-# ---- soft dark palette (2026-07-09: "less bright, smoother on the eyes") ----
+# ---- soft dark palette ----
 BG = "#24262b"        # window / frame background
 PANEL = "#2d3037"     # buttons, tabs, raised chrome
 FIELD = "#33363d"     # entry / list / text backgrounds
@@ -51,7 +47,7 @@ def apply_dark_theme(root):
     root.option_add("*TCombobox*Listbox.foreground", FG)
     root.option_add("*TCombobox*Listbox.selectBackground", SEL_BG)
     root.option_add("*TCombobox*Listbox.selectForeground", "#e4e7ec")
-    # --- extension for Save Studio (same palette): Treeview + Menubutton ---
+    # --- Treeview + Menubutton (same palette) ---
     style.configure("Treeview", background=FIELD, fieldbackground=FIELD,
                     foreground=FG, bordercolor="#3a3d44")
     style.map("Treeview", background=[("selected", SEL_BG)],

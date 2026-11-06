@@ -12,6 +12,7 @@ Uses the same game folder + workspace as the GUI (studio_config.json).
   quest_cli.py restore                             (put originals back)
   quest_cli.py export QUEST_NO FILE / import QUEST_NO FILE
   quest_cli.py verify                              (parser self-test)
+  quest_cli.py invaders [N] [--mon NAME]           (the game's invader lists)
 
 Examples:
   quest_cli.py edit 2906 --name "My Hunt" --time 25 \\
@@ -19,6 +20,7 @@ Examples:
   quest_cli.py edit 2906 --copy-mon 2:1206          (clone a monster block)
   quest_cli.py edit 2906 --reward1 "9:3:0,311:2:25"  (id:amount:chance)
   quest_cli.py edit 60000 --category 0x08010001      (flags, hex)
+  quest_cli.py edit 11501 --invader-chance 100 --invader-max 2 --invader-list 76
 """
 import argparse
 import sys
@@ -44,11 +46,21 @@ SCALARS = {  # option -> quest_format field
     "crate": "supp_set_no", "demo": "demo_no",
     "supp_time_flag": "supp_time_flag", "start_param": "start_param",
     "ren_pattern": "ren_pattern", "rannyu_limite": "rannyu_limite",
+    "enemy_lv": "enemy_lv", "hagi_no": "hagi_no", "prog_no": "prog_no",
+    "supp_enemy_type": "supp_enemy_type", "supp_enemy_num": "supp_enemy_num",
     "special_flag": "special_flag", "special_cond": "special_cond",
     "special_cond2": "special_cond2", "category": "category",
     "clr_pattern": "clr_pattern",
     "obj1_type": "obj1_param", "obj1_id": "obj1_id", "obj1_num": "obj1_num",
     "obj2_type": "obj2_param", "obj2_id": "obj2_id", "obj2_num": "obj2_num",
+    "invader_chance": "nora_set_per", "invader_try_chance": "nora_per_type",
+    "invader_max": "nora_set_max", "invader_list": "nora_set_table",
+    "qurupeco_call": "nora_pekko", "nora_set_type": "nora_set_type",
+}
+LIMITS = {  # quest_format field -> allowed range for --options
+    "special_cond": (0, GD.COND_COUNT - 1), "special_cond2": (0, GD.COND_COUNT - 1),
+    "nora_set_per": (0, 100), "nora_per_type": (0, 100),
+    "nora_set_max": (0, GD.INVADER_HARD_MAX), "nora_set_table": (0, 255),
 }
 
 
@@ -80,7 +92,7 @@ def show(q):
             rest = " ".join(f"{k}={v}" for k, v in m.items() if k != "Type")
             print(f"  monster {i + 1}: {GD.mon_name(m['Type'])} ({m['Type']})  "
                   f"{rest}")
-            print(f"             {GD.stats_text(m['Type'], m['Nando_hp'], m['Nando_at'], m['Nando_etc'], g('category'))}")
+            print(f"             {GD.stats_text(m['Type'], m['Nando_hp'], m['Nando_at'], m['Nando_etc'], g('category'), m['Nando2'])}")
     for col, recs in ((1, q.reward1), (2, q.reward2)):
         txt = ", ".join(f"{GD.item_name(i)} x{n}" + (f" ({p}%)" if p else "")
                         for i, n, p in recs)
@@ -88,8 +100,20 @@ def show(q):
     print(f"  objective: {q.objective_text(GD.mon_name, GD.item_name)}")
     print(f"  money: fee {g('contract')}z  reward {g('reward_money')}z  "
           f"penalty {g('penalty')}z  HRP {g('main_hrp')}/{g('failure_hrp')}")
+    sp, lv = g("start_param"), g("enemy_lv")
+    print(f"  start: {sp} {GD.START_PARAM.get(sp, '?')} "
+          f"({GD.start_text(g('map'), sp)}); monster rank: {lv} "
+          f"{GD.ENEMY_LV.get(lv, '?')}")
     print(f"  crate (set {g('supp_set_no')}): "
           f"{GD.supp_set_summary(g('supp_set_no'))}")
+    lines, probs = GD.supply_plan(g("quest_no"), g("supp_set_no"),
+                                  g("supp_time_flag"), g("hagi_no"),
+                                  g("supp_enemy_type"), g("supp_enemy_num"),
+                                  g("time_min"))
+    print(f"  supplies (SuppTimeFlag {g('supp_time_flag')}, HagiNo "
+          f"{g('hagi_no')}): {' '.join(lines)}")
+    for p in probs:
+        print(f"WARNING: {p}")
     print(f"  category 0x{g('category'):X}: {GD.category_summary(g('category'))}")
     c1, c2 = g("special_cond"), g("special_cond2")
     print(f"  who can join: rules {c1} ({GD.cond_name(c1)}), {c2} "
@@ -97,6 +121,30 @@ def show(q):
           f"{GD.req_text(g('special_flag'))}")
     for p in GD.requirement_problems(g("special_flag"), c1, c2):
         print(f"WARNING: {p}")
+    per, table = g("nora_set_per"), g("nora_set_table")
+    if per or g("nora_pekko"):
+        peco = GD.QURUPECOS & {m["Type"] for m in q.monsters if m["Type"]}
+        how = ("when the Qurupeco calls" if peco else
+               "none: NoraPekko skips the timer and no Qurupeco calls"
+               if g("nora_pekko") else
+               f"in {per}% of runs, {g('nora_per_type')}% per try every 2 "
+               f"min while none is up")
+        print(f"  invaders: list {table} ({GD.invader_list_label(table)}), "
+              f"{how}, up to {min(g('nora_set_max'), GD.INVADER_HARD_MAX)}")
+        for line in GD.invader_lines(table, g("category")):
+            print(f"             {line}")
+    else:
+        print("  invaders: none (stable area)")
+    for p in invader_problems(q) + GD.text_problems(q):
+        print(f"WARNING: {p}")
+
+
+def invader_problems(q):
+    g = q.get
+    return GD.invader_problems(g("nora_set_per"), g("nora_per_type"),
+                               g("nora_set_max"), g("nora_set_table"),
+                               g("nora_pekko"), g("map"),
+                               [m["Type"] for m in q.monsters if m["Type"]])
 
 
 def cmd_list(a):
@@ -168,10 +216,10 @@ def cmd_edit(a):
     for opt, field in SCALARS.items():
         v = getattr(a, opt)
         if v is not None:
-            if field in ("special_cond", "special_cond2") and not \
-                    0 <= v < GD.COND_COUNT:
+            lo, hi = LIMITS.get(field, (None, None))
+            if lo is not None and not lo <= v <= hi:
                 raise SystemExit(f"--{opt.replace('_', '-')} must be "
-                                 f"0..{GD.COND_COUNT - 1}")
+                                 f"{lo}..{hi}")
             q.set(field, v)
     for spec in a.copy_mon or []:
         parts = spec.split(":")
@@ -199,6 +247,21 @@ def cmd_edit(a):
                                    enumerate(q.monsters)], q.get("map")):
         print(f"WARNING: {w}")
     print(f"saved {leaf} to the workspace; run 'install' to put it in the game")
+
+
+def cmd_invaders(a):
+    mon = GD.resolve_mon_id(a.mon) if a.mon else None
+    nums = [a.list_no] if a.list_no is not None else sorted(GD.INVADER_LISTS)
+    for n in nums:
+        cands = GD.invader_list(n)
+        if mon is not None and mon not in [c["em"] for c in cands]:
+            continue
+        users = GD.invader_used_by(n)
+        print(f"{n:3d}  {GD.invader_list_label(n)}"
+              + (f"   used by {', '.join(users)}" if users else ""))
+        if a.list_no is not None:
+            for line in GD.invader_lines(n):
+                print(f"       {line}")
 
 
 def cmd_revert(a):
@@ -295,6 +358,11 @@ def main():
     p.add_argument("--reward1", metavar="id:amount:chance,...")
     p.add_argument("--reward2", metavar="id:amount:chance,...")
     p.set_defaults(fn=cmd_edit)
+
+    p = sub.add_parser("invaders")
+    p.add_argument("list_no", type=int, nargs="?")
+    p.add_argument("--mon")
+    p.set_defaults(fn=cmd_invaders)
 
     for name, fn in (("revert", cmd_revert),):
         p = sub.add_parser(name)

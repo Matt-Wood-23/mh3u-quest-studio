@@ -11,9 +11,11 @@ No game files are included. You need your own copy of the game.
 
 ## What you can change
 
-- **Text**: name, objective, description, client and failure text, in all 5 language slots or one at a time.
-- **Settings**: map, time limit, star rank, fee, reward money, HR points, starting supply crate (with a preview of what's in it).
+- **Text**: name, objective, description, client and failure text, in all 5 language slots or one at a time. The game never wraps or scrolls text, so the editor warns about descriptions longer than 7 lines or lines over 39 characters.
+- **Settings**: map, time limit, star rank, fee, reward money, HR points, where hunters start (base camp or a random area, with each map's odds) and the monster rank tier (low, high or G).
+- **Supplies**: the supply crate, picked from a list that shows which quests use each crate and what sets it apart (its full contents are shown underneath), and when it arrives. You can choose everything at the start, part of it with the rest delivered on the game's random timer (3 to 15 minutes into a 50-minute quest) or after 2 minutes, or a delivery after the hunters hunt a set number of one monster. The editor spells out what the box will hold at the start and what comes later, and warns when a time limit makes the delivery uncertain.
 - **Who can join**: the rules the game enforces (HR minimum, no armor or talismans, player limit) and the requirement line shown on the quest board, which follows the rules.
+- **Invaders**: whether the area is unstable, the chance of invaders, how many, and which of the game's invader lists to use (each list shows its monsters, their odds and strength, and the quests that use it). It warns about invaders that can't spawn on the quest's map. On a quest with a Qurupeco, its call brings the invader in.
 - **Objective**: hunt, capture, slay or deliver, with the target and count.
 - **Monsters**: up to 5 large monsters. Pick the species, count, size and difficulty. **Copy from quest…** clones a monster from any base quest, which is the safest way to add one.
 - **Rewards**: both reward columns, up to 32 items each.
@@ -28,6 +30,7 @@ Each monster has three difficulty bytes (Capcom calls them *Nando*): **HP row**,
 - **HP**: max HP = the monster's base HP × the row's HP multiplier, as the game computes it at spawn.
 - **Attack**: multiplier on the monster's attacks.
 - **Damage taken**: every hit on the monster is multiplied by this. Lower is tougher.
+- **Row spread** (*Nando2*, a dropdown): the game moves all three rows at random each hunt: 0 = fixed, 1 = up to 2 rows either way, 2 = up to 2 rows down. The editor then shows a range: Narg at Nite's Nargacuga has 5,712–6,216 HP.
 - Quests with Category flag `0x10` or `0x100000` (the Grudge Match / Challenge quests) take another ×0.55 off monster HP.
 
 Values above 127 run past the end of the table, so the editor refuses them.
@@ -36,6 +39,8 @@ Values above 127 run past the end of the table, so the editor refuses them.
 
 - **Monster / map mismatch.** The game only has spawn data for some monster and map pairs. Putting a monster in slot 1 on a map it has no data for **crashes the game when the quest loads**. The editor warns before saving.
 - **Objectives don't follow monster changes.** If you swap the target monster, update the objective target too, or the quest can't be completed.
+- **Supplies that never come.** Only 50-minute quests are certain to get the timed delivery; other time limits can miss it, and some get none.
+- **Text the game shows badly.** Descriptions over 7 lines spill off the panel, and long lines run past the box.
 
 ## Setup
 
@@ -73,6 +78,8 @@ python quest_cli.py list --mon "Great Jaggi"
 python quest_cli.py show 2906
 python quest_cli.py edit 2906 --name "My Hunt" --time 25 --mon "2:Type=Great Jaggi,Num=1,Nando_hp=40"
 python quest_cli.py edit 2906 --copy-mon 2:1206
+python quest_cli.py edit 11501 --invader-list 76 --invader-max 2
+python quest_cli.py invaders --mon Deviljho
 python quest_cli.py install
 python quest_cli.py restore
 ```
@@ -86,6 +93,7 @@ Run `python quest_cli.py -h` for every option.
 - **Event (DLC) quests come from the host.** Players joining an edited event quest saw the host's edited version, so only the host needs it. US and EU players can share a room.
 - Japanese version: not tested.
 - Most Category flag bits are labeled only by which quests use them. Only the HP ×0.55 bits are confirmed in the game code.
+- The invader, start-position, monster-rank and supply settings are explained from the game's code, and most were checked in-game on the US version. Not yet seen in-game: invaders online, the star-rank gate on invaders, and removing an intro cutscene (it only plays on a save that hasn't seen it). The invader lists themselves are part of the game's code, so quests can pick a list but not change one.
 
 ## Credits
 

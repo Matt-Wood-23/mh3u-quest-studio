@@ -1,5 +1,5 @@
 {
- "description": "Per-monster stage placement legality, dumped from the RPX static table @0x101f9c80 (MH3G_Cafe_US v1.3 ELF, Ghidra, 2026-07-03). placement[em_id] = list of INTERNAL stage ids the monster has spawn-placement data for. A quest whose slot-0 monster lacks the quest's stage CRASHES at quest load (null deref in FUN_0216d798); later slots are empirically laxer (Silver Rathalos played at slot 3 on a stage not in his list) but treat any mismatch as a warning.",
+ "description": "Per-monster stage placement legality, dumped from the RPX static table @0x101f9c80 (MH3G_Cafe_US v1.3 ELF, Ghidra). placement[em_id] = list of INTERNAL stage ids the monster has spawn-placement data for. A quest whose slot-0 monster lacks the quest's stage CRASHES at quest load (null deref in FUN_0216d798); later slots are empirically laxer (Silver Rathalos played at slot 3 on a stage not in his list) but treat any mismatch as a warning.",
  "internal_stage_names": {
   "1": "Deserted Island",
   "2": "Sandy Plains",
