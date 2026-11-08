@@ -7,7 +7,9 @@ A quest editor for **Monster Hunter 3 Ultimate (Wii U)** running in Cemu. It edi
 
 No game files are included. You need your own copy of the game.
 
-![Monster editor showing what each difficulty row does](docs/studio_monsters.png)
+It looks like the game: monster and item icons, quest scrolls, star ranks and the in-game area maps, read from your own game files the first time you open it (none of the game's art ships with the editor).
+
+![Monsters tab: each monster's icon and difficulty, and the area map with where the hunters, the monsters and possible invaders start](docs/studio_monsters.png)
 
 ## What you can change
 
@@ -16,11 +18,19 @@ No game files are included. You need your own copy of the game.
 - **Supplies**: the supply crate, picked from a list that shows which quests use each crate and what sets it apart (its full contents are shown underneath), and when it arrives. You can choose everything at the start, part of it with the rest delivered on the game's random timer (3 to 15 minutes into a 50-minute quest) or after 2 minutes, or a delivery after the hunters hunt a set number of one monster. The editor spells out what the box will hold at the start and what comes later, and warns when a time limit makes the delivery uncertain.
 - **Who can join**: the rules the game enforces (HR minimum, no armor or talismans, player limit) and the requirement line shown on the quest board, which follows the rules.
 - **Invaders**: whether the area is unstable, the chance of invaders, how many, and which of the game's invader lists to use (each list shows its monsters, their odds and strength, and the quests that use it). It warns about invaders that can't spawn on the quest's map. On a quest with a Qurupeco, its call brings the invader in.
-- **Objective**: hunt, capture, slay or deliver, with the target and count.
+- **Objective**: hunt, capture, slay or deliver, with the target and count. A quest holds two targets at most; **Hunt all large monsters** sets up a 3–5 monster hunt the way the game's own quests do (the last one or two monsters as targets, with the monster order set).
 - **Monsters**: up to 5 large monsters. Pick the species, count, size and difficulty, how much the size varies, where it starts and its stamina (see below). **Copy from quest…** clones a monster from any base quest, which is the safest way to add one.
 - **Rewards**: both reward columns, up to 32 items each.
 - **Arena**: on arena quests, the S and A rank clear times and the 5 gear sets the player picks from: weapon, armor, talisman and its two skills, item pouch and ammo pouch (see [Arena quests](#arena-quests)).
 - **Flags**: the quest's Category bit field.
+
+![Rewards tab with item icons](docs/studio_rewards.png)
+
+![Supplies: the crate's contents as icons, and when the rest arrives](docs/studio_supplies.png)
+
+**Browse crates…** lists every supply crate with its contents; type a quest or item name to search.
+
+![Crate browser](docs/studio_crates.png)
 
 ### The difficulty numbers
 
