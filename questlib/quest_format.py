@@ -58,6 +58,60 @@ class QuestFormatError(ValueError):
     pass
 
 
+# The end block after the objectives (game reader 0x02077128): arena rank
+# times, then the unlock rule. 21 bytes in every quest.
+END_BLOCK = 21
+
+# Arena block: the placed-monster list (em_set, 45-byte entries) and the gear
+# sets (ac_equip, 172 bytes each). The game reads it only for the quest
+# numbers in has_arena_block (0x02076C6C).
+EM_SET_SIZE = 45
+ARENA_SET_SIZE = 172
+ARENA_EQUIP = 9      # (type, id): weapon, -, -, head, chest, waist, arms, legs, talisman
+ARENA_SKILLS = 2     # talisman skills: (skill tree, points as s8)
+ARENA_POUCH = 24     # (item, count)
+ARENA_AMMO = 8       # (item, count)
+ARENA_SLOT_NAMES = ("Weapon", "(unused)", "(unused)", "Head", "Chest",
+                    "Waist", "Arms", "Legs", "Talisman")
+# equipment type of each armor/talisman slot (save-file equipment enum)
+ARENA_SLOT_TYPE = {3: 5, 4: 1, 5: 3, 6: 2, 7: 4, 8: 6}
+
+
+def has_arena_block(quest_no):
+    """Quest numbers whose record carries the placed-monster + gear lists:
+    20100-20399 (event quests) and 60000-69999 (Grudge Match / Challenge)."""
+    return 201 <= quest_no // 100 <= 203 or quest_no // 10000 == 6
+
+
+def unpack_arena_set(b):
+    v = struct.unpack("<86H", b)
+    pairs = [[v[2 * i], v[2 * i + 1]] for i in range(43)]
+    return {"equip": pairs[0:9], "skills": pairs[9:11],
+            "pouch": pairs[11:35], "ammo": pairs[35:43]}
+
+
+def pack_arena_set(s):
+    pairs = (list(s["equip"]) + list(s["skills"]) + list(s["pouch"]) +
+             list(s["ammo"]))
+    if len(pairs) != 43:
+        raise QuestFormatError("gear set needs 9 + 2 + 24 + 8 entries")
+    flat = [int(x) for p in pairs for x in p]
+    if any(not 0 <= x <= 0xFFFF for x in flat):
+        raise QuestFormatError("gear set value outside 0-65535")
+    return struct.pack("<86H", *flat)
+
+
+def skill_points(raw):
+    """Talisman skill points are stored as a signed byte (254 = -2)."""
+    return raw - 256 if 128 <= raw <= 255 else raw
+
+
+def skill_raw(points):
+    if not -128 <= points <= 127:
+        raise QuestFormatError(f"skill points {points} outside -128..127")
+    return points & 0xFF
+
+
 class Quest:
     def __init__(self, data):
         self.data = bytearray(data)
@@ -190,7 +244,44 @@ class Quest:
         scalar("obj2_param", "<I")      # live 648
         scalar("obj2_id", "<H")         # live 652
         scalar("obj2_num", "<h")        # live 654
-        self._rest_off = pos            # trailing flag block(s), unparsed
+        # end block: arena rank times (seconds) and the unlock rule
+        # (counters per openSource bit; shown when the sum over openFlag's
+        # bits reaches openNum)
+        if pos + END_BLOCK <= len(d):
+            scalar("arena_time_s", "<H")    # ArenaTimeS
+            scalar("arena_time_a", "<H")    # ArenaTimeA
+            scalar("open_flag", "<Q")       # openFlag
+            scalar("open_source", "<Q")     # openSource
+            scalar("open_num", "B")         # openNum
+        self._rest_off = pos
+        self._parse_arena(pos)
+
+    def _parse_arena(self, pos):
+        """em_set + ac_equip lists. self.arena_sets stays empty when the
+        quest number has no arena block or the bytes don't fit one."""
+        d = self.data
+        self.em_set_count = 0
+        self.arena_sets = []
+        self._ac_off = None
+        self.arena_end = None
+        if "open_num" not in self._scalar or not has_arena_block(
+                self.get("quest_no")):
+            return
+        try:
+            (ne,) = struct.unpack_from("<I", d, pos)
+            p = pos + 4 + ne * EM_SET_SIZE
+            (na,) = struct.unpack_from("<I", d, p)
+        except struct.error:
+            return
+        end = p + 4 + na * ARENA_SET_SIZE
+        if ne > 1000 or na > 64 or end > len(d):
+            return
+        self.em_set_count = ne
+        self._ac_off = p + 4
+        self.arena_sets = [unpack_arena_set(bytes(
+            d[self._ac_off + i * ARENA_SET_SIZE:
+              self._ac_off + (i + 1) * ARENA_SET_SIZE])) for i in range(na)]
+        self.arena_end = end
 
     def _parse_reward_table(self, start):
         recs = []
@@ -283,6 +374,15 @@ class Quest:
         else:
             self.reward2 = records
 
+    def set_arena_set(self, i, gear):
+        """Overwrite gear set i (a dict like unpack_arena_set returns)."""
+        if self._ac_off is None or not 0 <= i < len(self.arena_sets):
+            raise QuestFormatError(f"this quest has no gear set {i + 1}")
+        o = self._ac_off + i * ARENA_SET_SIZE
+        self.data[o:o + ARENA_SET_SIZE] = pack_arena_set(gear)
+        self.arena_sets[i] = unpack_arena_set(bytes(
+            self.data[o:o + ARENA_SET_SIZE]))
+
     def set_rewards(self, records):
         """Legacy shim: single list, split Reward1-first like the `rewards`
         property (first len(reward1) records -> table 1, rest -> table 2)."""
@@ -342,6 +442,8 @@ def identity_rewrite(data):
         q.set_monster(slot, **q.monsters[slot])
     q.set_reward_table(1, list(q.reward1))
     q.set_reward_table(2, list(q.reward2))
+    for i, gear in enumerate(list(q.arena_sets)):
+        q.set_arena_set(i, gear)
     for field in STRING_FIELDS:
         for lang in range(NLANG):
             q.set_string(field, q.get_string(field, lang, decode=False),

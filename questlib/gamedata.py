@@ -43,6 +43,14 @@ SUPP_SLOTS = {int(k): [it.get("slot", i) for i, it in enumerate(v["items"])]
               for k, v in _supp.items()}
 SUPP_USERS = {int(k): v.get("used_by", []) for k, v in _supp.items()}
 START_AREAS = {int(k): v for k, v in _load("start_areas.json")["maps"].items()}
+# The game numbers areas internally; the map shows other numbers on some
+# maps. Index = internal area, value = the map's number (0 = base camp).
+AREA_SHOWN = {int(k): v for k, v in _load("area_labels.json")["maps"].items()}
+_spawn = _load("spawn_tables.json")
+SIZE_SPREAD = _spawn["size_spread"]     # [Sizeparam] -> [[weight, lo, hi]]
+SPAWN_POINTS = {int(em): {int(st): recs for st, recs in per.items()}
+                for em, per in _spawn["spawn_points"].items()}
+_usage = _load("field_usage.json")
 _inv = _load("invaders.json")
 INVADER_LISTS = {int(k): v for k, v in _inv["lists"].items()}
 INVADER_LIST_COUNT = _inv["count"]          # NoraSetTable 0..count-1
@@ -70,6 +78,18 @@ def item_name(item_id):
 
 def map_name(m):
     return MAP_NAMES.get(m, f"map {m}")
+
+
+def area_text(quest_map, a):
+    """Internal area number a, named the way the in-game map shows it."""
+    if a == 0:
+        return "camp"
+    shown = AREA_SHOWN.get(quest_map)
+    if shown is None:
+        return f"area {a}"
+    if a < len(shown):
+        return f"area {shown[a]}"
+    return f"area ? (game number {a})"
 
 
 def resolve_mon_id(v):
@@ -138,7 +158,110 @@ def _span(lo, hi, fmt="{:g}"):
     return fmt.format(lo) if lo == hi else f"{fmt.format(lo)}–{fmt.format(hi)}"
 
 
-def stats_text(em_id, nando_hp, nando_at, nando_etc, category=0, spread=0):
+def _pp(x):
+    return f"{x:+d}".replace("-", "−")
+
+
+# Sizeparam (the "size spread") picks one of 35 tables (0x101F9DE8). At spawn
+# 0x020F2AAC makes a weighted pick from it, then a value in that entry's
+# range: size % = Size + value. Table 0 is empty = exactly Size. Sizeparam 35
+# and up reads past the table.
+def size_range(size_param):
+    """(low, high) in % points added to Size; None past the table."""
+    if not 0 <= size_param < len(SIZE_SPREAD):
+        return None
+    t = SIZE_SPREAD[size_param]
+    if not t:
+        return (0, 0)
+    return (min(lo for _, lo, _ in t), max(hi for _, _, hi in t))
+
+
+def size_choice(size_param):
+    r = size_range(size_param)
+    if r is None:
+        return f"{size_param}  past the game's table"
+    if r == (0, 0):
+        return f"{size_param}  exact size"
+    return f"{size_param}  {_pp(r[0])} to {_pp(r[1])}%"
+
+
+SIZE_CHOICES = [size_choice(p) for p in range(len(SIZE_SPREAD))]
+
+
+def size_text(size, size_param):
+    r = size_range(size_param)
+    if r is None:
+        return f"size {size}% (the size spread reads past the game's table)"
+    return f"size {_span(size + r[0], size + r[1])}%"
+
+
+# Starttype (the "spawn type") picks one of the monster's spawn points for
+# the quest's map, from the same placement table as the stage check
+# (0x101F9C80, read by 0x0216D798). Each point sets the area the monster
+# starts in (its area_no).
+def spawn_points(em_id, quest_map):
+    """[[area, prog_type], ...] or None when there's no list."""
+    st = MAP_TO_INTERNAL.get(quest_map)
+    if st is None:
+        return None
+    return SPAWN_POINTS.get(em_id, {}).get(st)
+
+
+def spawn_area_text(quest_map, a):
+    """Where a monster's spawn point puts it. Area 0 is camp for hunters,
+    but the one monster spawn point there (Ceadeus on the Ruins) is its
+    entrance off the map: it swims into area 1 from there."""
+    if a == 0:
+        return ("its entrance (swims into area 1)" if quest_map == 7
+                else "its entrance off the map")
+    return area_text(quest_map, a)
+
+
+def spawn_choice(v, points, quest_map=None):
+    if points is None:
+        return str(v)
+    if 0 <= v < len(points):
+        a = points[v][0]
+        return (f"{v}  starts at {spawn_area_text(quest_map, a)}" if a == 0
+                else f"{v}  starts in {area_text(quest_map, a)}")
+    return f"{v}  no such spawn point"
+
+
+# Stamina picks a row of the monster's own stamina table (staminaTblIdx: how
+# much stamina it rolls and how long it stays tired, 0x025A6610 / 0x025C2094).
+# The rows live in game data, so these are the game's own uses.
+STAMINA = {0: "village quests", 1: "Port low and high rank", 2: "G rank",
+           3: "arena quests"}
+
+
+def stamina_choice(v):
+    return f"{v}  {STAMINA.get(v, 'not used by the game')}"
+
+
+def _title(tag):
+    return tag.split(" ", 1)[1] if " " in tag else tag
+
+
+# DemoNo / ProgNo / Ren_pattern: labelled by the quests that use each value.
+DEMO_NO = {0: "none"}
+for _v, _uses in _usage["demo_no"].items():
+    _u = _uses[0]
+    DEMO_NO[int(_v)] = (f"{_u['monsters'][0]} ({_title(_u['quest'])})"
+                        if _u["monsters"] else _title(_u["quest"]))
+PROG_NO = {0: "none"}
+for _v, _uses in _usage["prog_no"].items():
+    PROG_NO[int(_v)] = f"story step of {_title(_uses[0])}"
+REN_PATTERN = {0: "none (most quests)"}
+for _v, _uses in _usage["ren_pattern"].items():
+    _n = sorted({u["monsters"] for u in _uses})
+    _lineup = f"{_n[0]}–{_n[-1]}" if len(_n) > 1 else f"{_n[0]}"
+    _how = f"{len(_uses)} quests, e.g." if len(_uses) > 1 else "as in"
+    _first = min(u["quest"] for u in _uses)
+    REN_PATTERN[int(_v)] = f"{_lineup} monsters ({_how} {_title(_first)})"
+
+
+def stats_text(em_id, nando_hp, nando_at, nando_etc, category=0, spread=0,
+               size=None, size_param=0):
     """What the game will apply; ranges when Nando2 spreads the rows."""
     if monster_stats(em_id, nando_hp, nando_at, nando_etc, category) is None:
         return "Nando values must be 0-127 (the table has 128 rows)"
@@ -159,8 +282,39 @@ def stats_text(em_id, nando_hp, nando_at, nando_etc, category=0, spread=0):
            + _span(min(s.atk_mult for s in stats), max(s.atk_mult for s in stats))
            + "  ·  damage taken x"
            + _span(min(s.dmg_mult for s in stats), max(s.dmg_mult for s in stats)))
-    if len(offs) > 1:
+    varies = len(offs) > 1
+    if size is not None:
+        out += "  ·  " + size_text(size, size_param)
+        r = size_range(size_param)
+        varies = varies or (r is not None and r != (0, 0))
+    if varies:
         out += "  (varies each hunt)"
+    return out
+
+
+def monster_problems(slot, m, quest_map):
+    """Warnings for one monster block (a dict with Type + the block fields)."""
+    em = m["Type"]
+    if not em:
+        return []
+    who = f"monster {slot + 1}: {mon_name(em)}"
+    out = []
+    if m["Num"] == 0:
+        out.append(f"{who} has count 0, so it won't appear")
+    elif m["Size"] == 0:
+        out.append(f"{who} has size 0%")
+    pts = spawn_points(em, quest_map)
+    if pts is not None and m["Starttype"] >= len(pts):
+        out.append(f"{who} has no spawn type {m['Starttype']} on "
+                   f"{map_name(quest_map)} (the game lists 0–{len(pts) - 1}), "
+                   f"so it may start in the wrong place or crash the game")
+    if size_range(m["Sizeparam"]) is None:
+        out.append(f"{who}: size spread {m['Sizeparam']} reads past the "
+                   f"game's table (0–{len(SIZE_SPREAD) - 1})")
+    if m["Stamina"] not in STAMINA:
+        out.append(f"{who}: stamina {m['Stamina']} isn't used by any of the "
+                   f"game's quests (they use 0–3), so the monster's table "
+                   f"may not have that row")
     return out
 
 
@@ -213,18 +367,52 @@ def legality_warnings(monsters, quest_map):
 
 # --------------------------------------------------------- supply crate
 
+# --------------------------------------------------------- quest groups
+# Where a base-game quest shows up, from its quest number.
+QUEST_GROUPS = ("Village", "Port", "Event", "Arena", "Moga Woods")
+
+
+def quest_group(quest_no):
+    if quest_no < 1000:
+        return "Moga Woods"          # training and Moga Woods free roam
+    if quest_no < 11000:
+        return "Village"
+    if quest_no < 20000:
+        return "Port"
+    if 20100 <= quest_no < 39000:
+        return "Event"               # the game's event-quest numbers
+    if 60000 <= quest_no < 62000:
+        return "Arena"               # Grudge Matches and Challenge Quests
+    return "Other"
+
+
+def quest_rank(quest_no):
+    """0 low / 1 high / 2 G rank from the quest number, None when the
+    number doesn't say (Moga Woods, Grudge and Challenge quests)."""
+    return next((r for lo, hi, r in _RANK_BY_NO if lo <= quest_no < hi), None)
+
+
+def supp_set_items(supp_set_no):
+    """[(item id, qty)] in a crate, per-hunter duplicates collapsed, or
+    None when the game has no such crate."""
+    items = SUPP_SETS.get(supp_set_no)
+    if items is None:
+        return None
+    seen, order = set(), []
+    for iid, qty in items:
+        if (iid, qty) not in seen:
+            seen.add((iid, qty))
+            order.append((iid, qty))
+    return order
+
+
 def supp_set_summary(supp_set_no):
     """Start-of-quest supply crate (quest/support/suppNNN.supp)."""
     if supp_set_no == 0:
         return "(no supply crate)"
-    items = SUPP_SETS.get(supp_set_no)
-    if items is None:
+    order = supp_set_items(supp_set_no)
+    if order is None:
         return f"(no supp{supp_set_no:03d}.supp in the game)"
-    seen, order = set(), []
-    for iid, qty in items:          # collapse the per-hunter duplicates
-        if (iid, qty) not in seen:
-            seen.add((iid, qty))
-            order.append((iid, qty))
     return ", ".join(f"{item_name(i)} x{q}" for i, q in order) or "(empty)"
 
 
@@ -425,8 +613,9 @@ def supply_plan(quest_no, set_no, flag, hagi, enemy_type, enemy_num,
     return lines, problems
 
 
-START_PARAM = {0: "Base camp", 1: "Random area (the map's own odds)",
-               2: "Fixed alternate area (a few maps only)"}
+START_PARAM = {0: "Base camp", 1: "Random area (main hunting maps)",
+               2: "Fixed area (Ruins, Sacred Land, Tainted Sea)"}
+_START_KIND = {1: "random start", 2: "fixed start area"}
 ENEMY_LV = {0: "Low rank (village)", 1: "Low rank (hub)",
             2: "High rank (village)", 3: "High rank (hub)", 4: "G rank"}
 
@@ -439,9 +628,32 @@ def start_text(quest_map, start_param):
     pairs = per[start_param]
     if len(pairs) == 1:
         a = pairs[0][0]
-        return "always base camp" if a == 0 else f"always area {a}"
-    return ", ".join(("camp" if a == 0 else f"area {a}") + f" {w}%"
-                     for a, w in pairs)
+        return ("always base camp" if a == 0
+                else f"always {area_text(quest_map, a)}")
+    return ", ".join(f"{area_text(quest_map, a)} {w}%" for a, w in pairs)
+
+
+def _start_maps(start_param):
+    """Maps where this StartParam starts the hunters away from base camp."""
+    return [m for m, per in sorted(START_AREAS.items())
+            if 0 <= start_param < len(per) and per[start_param] != [[0, 100]]]
+
+
+def start_warning(quest_map, start_param):
+    """Why this StartParam does nothing on this map (the hunters still start
+    at base camp), or None when it works here or is 0."""
+    if start_param == 0 or quest_map in _start_maps(start_param):
+        return None
+    where = [map_name(m) for m in _start_maps(start_param)]
+    if not where:
+        return "No map uses this value, so it's the same as 0."
+    kind = _START_KIND.get(start_param, "start list for this value")
+    text = (f"{map_name(quest_map)} has no {kind}, so this is the same as 0"
+            if quest_map in START_AREAS else "this is the same as 0")
+    text += (". It only changes the start on "
+             + (", ".join(where[:-1]) + " and " + where[-1]
+                if len(where) > 1 else where[0]))
+    return text + "."
 
 
 # ------------------------------------------------- who can join a quest
@@ -596,7 +808,8 @@ def invader_lines(n, category=0):
     out = []
     for c in invader_list(n):
         out.append(f"{mon_name(c['em'])}: {c['weight']}% of picks · needs "
-                   f"★{c['min_star']} unlocked · size {c['Size']}%")
+                   f"★{c['min_star']} unlocked · "
+                   f"{size_text(c['Size'], c.get('Sizeparam', 0))}")
         out.append("      " + stats_text(c["em"], c["Nando_hp"], c["Nando_at"],
                                          c["Nando_etc"], category,
                                          c.get("Nando2", 0)))
@@ -681,3 +894,126 @@ def text_problems(q):
     return [msg.format("" if len(lgs) == len(TEXT_LANGS)
                        else f" [{', '.join(lgs)}]")
             for msg, lgs in found.items()]
+
+
+# ------------------------------------------------------------ arena gear
+# Gear sets use the save file's (equipment type, id) pairs: 1 chest, 2 arms,
+# 3 waist, 4 legs, 5 head, 6 talisman, 7-19 weapons (12 unused).
+_eq = _load("equipment_en.json")
+EQUIP_TYPES = {int(k): v for k, v in _eq["types"].items()}
+EQUIP_NAMES = {int(k): v for k, v in _eq["names"].items()}
+CHARM_SKILLS = _eq["charm_skills"]
+WEAPON_TYPES = sorted(t for t in EQUIP_TYPES if t >= 7)
+BOWGUN_TYPES = (11, 13)          # these load shots from the ammo pouch
+ARENA_KINDS = ((60000, 61000, "Grudge Match"), (61000, 62000, "Challenge"))
+# The Arena Clerk's lists are fixed tables of quest numbers in the game code
+# (0x10026FF4): Grudge Match 60000-60011, Challenge Quest 61000-61009. The
+# Challenge list reads its quests from the quest4 event pack when it opens.
+GRUDGE_LISTED = range(60000, 60012)
+CHALLENGE_LISTED = range(61000, 61010)
+CHALLENGE_PACK = "quest4"
+ARENA_B_RANK = 1800              # the game adds a fixed B rank of 30:00
+
+
+def equip_name(etype, eid):
+    if not eid:
+        return "(none)"
+    names = EQUIP_NAMES.get(etype)
+    if names is None:
+        return f"type {etype} #{eid}"
+    return names[eid] if 0 <= eid < len(names) else f"#{eid}"
+
+
+def equip_choices(etype):
+    """[(id, name)] for a picker: the game's DUMMY slots and its display
+    copies of DLC names are left out."""
+    out = [(0, "(none)")]
+    for i, n in enumerate(EQUIP_NAMES.get(etype, [])):
+        if i and n not in ("DUMMY", "") and "(dup of" not in n \
+                and not n.startswith("(None"):
+            out.append((i, n))
+    return out
+
+
+def charm_skill_name(i):
+    if not i:
+        return "(none)"
+    return CHARM_SKILLS[i] if 0 <= i < len(CHARM_SKILLS) else f"skill #{i}"
+
+
+def arena_kind(quest_no):
+    for lo, hi, name in ARENA_KINDS:
+        if lo <= quest_no < hi:
+            return name
+    return None
+
+
+def clock(seconds):
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def arena_set_summary(gear):
+    t, i = gear["equip"][0]
+    return (f"{EQUIP_TYPES.get(t, 'no weapon')}: {equip_name(t, i)}"
+            if i else "no weapon")
+
+
+def arena_pack_problem(quest_no, pack):
+    """Challenge Quests only list from the quest4 event pack; Grudge Matches
+    always come from the base game, so a pack copy never lists."""
+    if not pack:
+        return []
+    if quest_no in GRUDGE_LISTED:
+        return [f"Grudge Matches (60000–60011) always come from the base "
+                f"game files, so #{quest_no} in {pack} won't show up in the "
+                f"game"]
+    if quest_no in CHALLENGE_LISTED and pack.lower() != CHALLENGE_PACK:
+        return [f"Challenge Quests are read from the {CHALLENGE_PACK} pack, "
+                f"so #{quest_no} in {pack} won't show up in the game"]
+    return []
+
+
+def arena_problems(q, pack=None):
+    """Gear-set checks for the save dialog. `pack` is the event pack's file
+    name, or None for a base-game quest."""
+    out = []
+    no = q.get("quest_no")
+    if not q.arena_sets:
+        return out
+    out += arena_pack_problem(no, pack)
+    kind = arena_kind(no)
+    filled = [i for i, g in enumerate(q.arena_sets)
+              if any(v for p in g["equip"] for v in p)]
+    if filled and not kind:
+        out.append(f"gear sets are filled in, but only Grudge Match "
+                   f"(60000-60999) and Challenge (61000-61999) quests hand "
+                   f"them out; #{no} is neither")
+    if not kind:
+        return out
+    if no not in GRUDGE_LISTED and no not in CHALLENGE_LISTED:
+        out.append(f"the Arena Clerk only lists Grudge Matches 60000-60011 "
+                   f"and Challenge Quests 61000-61009, so #{no} won't show "
+                   f"up in the game")
+    for i, g in enumerate(q.arena_sets, 1):
+        t, wid = g["equip"][0]
+        if not wid:
+            out.append(f"gear set {i} has no weapon")
+        elif t in BOWGUN_TYPES and not any(n for _, n in g["ammo"]):
+            out.append(f"gear set {i} is a bowgun with an empty ammo pouch")
+        stacks = {}
+        for item, num in g["pouch"]:
+            if item and num:
+                stacks[item] = stacks.get(item, 0) + 1
+        dup = [item_name(it) for it, c in stacks.items() if c > 1]
+        if dup:
+            out.append(f"gear set {i} has {', '.join(dup)} in more than one "
+                       f"pouch slot; the game merges them into one stack, "
+                       f"capped at what the pouch can hold")
+    s, a = q.get("arena_time_s"), q.get("arena_time_a")
+    if s and a and s >= a:
+        out.append(f"S rank time {clock(s)} isn't faster than A rank "
+                   f"{clock(a)}")
+    if a and a > q.get("time_min") * 60:
+        out.append(f"A rank time {clock(a)} is longer than the "
+                   f"{q.get('time_min')}-minute time limit")
+    return out

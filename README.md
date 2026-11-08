@@ -17,8 +17,9 @@ No game files are included. You need your own copy of the game.
 - **Who can join**: the rules the game enforces (HR minimum, no armor or talismans, player limit) and the requirement line shown on the quest board, which follows the rules.
 - **Invaders**: whether the area is unstable, the chance of invaders, how many, and which of the game's invader lists to use (each list shows its monsters, their odds and strength, and the quests that use it). It warns about invaders that can't spawn on the quest's map. On a quest with a Qurupeco, its call brings the invader in.
 - **Objective**: hunt, capture, slay or deliver, with the target and count.
-- **Monsters**: up to 5 large monsters. Pick the species, count, size and difficulty. **Copy from quest…** clones a monster from any base quest, which is the safest way to add one.
+- **Monsters**: up to 5 large monsters. Pick the species, count, size and difficulty, how much the size varies, where it starts and its stamina (see below). **Copy from quest…** clones a monster from any base quest, which is the safest way to add one.
 - **Rewards**: both reward columns, up to 32 items each.
+- **Arena**: on arena quests, the S and A rank clear times and the 5 gear sets the player picks from: weapon, armor, talisman and its two skills, item pouch and ammo pouch (see [Arena quests](#arena-quests)).
 - **Flags**: the quest's Category bit field.
 
 ### The difficulty numbers
@@ -34,6 +35,16 @@ Each monster has three difficulty bytes (Capcom calls them *Nando*): **HP row**,
 - Quests with Category flag `0x10` or `0x100000` (the Grudge Match / Challenge quests) take another ×0.55 off monster HP.
 
 Values above 127 run past the end of the table, so the editor refuses them.
+
+### Size, spawn point and stamina
+
+These are dropdowns too, read from the game's own tables:
+
+- **Size spread** (*Sizeparam*): picks one of the game's 35 size tables. Each hunt the game adds a random amount from it to **Size %**, so the editor shows the range, e.g. Size 100 with spread 18 = 88–125%. 0 = always exactly Size %.
+- **Spawn type** (*Starttype*): picks one of the monster's own spawn points on the quest's map, which sets the area it starts in. The list changes with the monster and the map, and the editor warns about a spawn type that monster doesn't have there.
+- **Stamina**: picks a row of the monster's stamina table (how soon it tires). The game's own quests use 0 in the village, 1 for Port low and high rank, 2 for G rank and 3 in the arena.
+
+The Advanced section labels the intro cutscene, story step and multi-monster order values with the game's quests that use them.
 
 ### Warnings it gives you
 
@@ -69,6 +80,24 @@ Open a pack from **Cemu save packs** (or **Open pack…**). The menu lists the p
 
 **New quest…** creates a brand-new event quest in the pack's first empty slot. It starts as a copy of an event quest you pick and gets a new quest number; then edit it like any other. Each pack holds 20 quests, and `quest3` is often empty. The game lists new quest numbers, and other players can join them without having the quest themselves. **Delete quest** empties a slot.
 
+### Arena quests
+
+The Arena Clerk in Port Tanzia lists two kinds of arena quest, and both lists are fixed sets of quest numbers in the game code:
+
+- **Arena Quests**: the Grudge Matches, 60000–60011, always from the base game files. A copy with one of those numbers in an event pack is ignored.
+- **Challenge Quests**: 61000–61009, read from the `quest4` event pack each time the list opens. Without Challenge quests in `quest4`, the list is empty. A Challenge quest in another pack, or with any other number, doesn't show up.
+
+To make one, open `quest4` and use **New quest…** with a Grudge Match or Challenge quest as the template. The editor gives it the first free number from 61000–61009; when all ten are used, edit or replace one of them. The **Arena** tab then sets:
+
+- **Rank times**: clear in under the S time for S rank, under the A time for A rank. B rank is always 30:00. The Arena Clerk shows the rank next to the player's best time.
+- **Gear sets**: after departing, the player picks one of 5 sets instead of their own gear. **Copy set from quest…** takes a set from any of the game's arena quests. Bowgun sets load from the ammo pouch, so the editor warns about a bowgun with an empty one. The same item in two pouch slots becomes one stack, capped at what the pouch can hold, so the editor warns about that too.
+
+The game copies the quest, gear sets included, when it is accepted. After saving an edit, accept the quest again (a quest accepted before the edit keeps the old sets).
+
+Online, a Challenge quest works like other event quests: only the host needs it in `quest4`, and the other players get the host's quest and gear sets (tested on two PCs).
+
+A custom Challenge quest was checked in-game on the US version: it was listed, showed its rank times, and handed out its gear sets, talisman skills and pouch.
+
 ## Command line
 
 `quest_cli.py` uses the same game folder and workspace as the GUI:
@@ -92,6 +121,7 @@ Run `python quest_cli.py -h` for every option.
 - **Online, base-game quest edits must be installed by everyone in the room.** Each game builds the quest card and spawns monsters from its own files. In testing, a player without the edit saw the original quest and not the added monster. The quest also ended for everyone as soon as that player met their own, original objective.
 - **Event (DLC) quests come from the host.** Players joining an edited event quest saw the host's edited version, so only the host needs it. US and EU players can share a room.
 - Japanese version: not tested.
+- Arena: only Challenge quests in `quest4` were tested. Grudge Match numbers in an event pack and arena quests online have not been tried.
 - Most Category flag bits are labeled only by which quests use them. Only the HP ×0.55 bits are confirmed in the game code.
 - The invader, start-position, monster-rank and supply settings are explained from the game's code, and most were checked in-game on the US version. Not yet seen in-game: invaders online, the star-rank gate on invaders, and removing an intro cutscene (it only plays on a save that hasn't seen it). The invader lists themselves are part of the game's code, so quests can pick a list but not change one.
 

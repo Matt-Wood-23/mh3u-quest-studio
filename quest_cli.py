@@ -92,7 +92,12 @@ def show(q):
             rest = " ".join(f"{k}={v}" for k, v in m.items() if k != "Type")
             print(f"  monster {i + 1}: {GD.mon_name(m['Type'])} ({m['Type']})  "
                   f"{rest}")
-            print(f"             {GD.stats_text(m['Type'], m['Nando_hp'], m['Nando_at'], m['Nando_etc'], g('category'), m['Nando2'])}")
+            print(f"             {GD.stats_text(m['Type'], m['Nando_hp'], m['Nando_at'], m['Nando_etc'], g('category'), m['Nando2'], m['Size'], m['Sizeparam'])}")
+            pts = GD.spawn_points(m["Type"], g("map"))
+            print(f"             spawn type {GD.spawn_choice(m['Starttype'], pts, g('map'))}"
+                  f"; stamina {GD.stamina_choice(m['Stamina'])}")
+            for p in GD.monster_problems(i, m, g("map")):
+                print(f"WARNING: {p}")
     for col, recs in ((1, q.reward1), (2, q.reward2)):
         txt = ", ".join(f"{GD.item_name(i)} x{n}" + (f" ({p}%)" if p else "")
                         for i, n, p in recs)
@@ -115,6 +120,13 @@ def show(q):
     for p in probs:
         print(f"WARNING: {p}")
     print(f"  category 0x{g('category'):X}: {GD.category_summary(g('category'))}")
+    for f, name, labels in (("demo_no", "intro cutscene", GD.DEMO_NO),
+                            ("prog_no", "story step", GD.PROG_NO),
+                            ("ren_pattern", "multi-monster order",
+                             GD.REN_PATTERN)):
+        if g(f):
+            print(f"  {name}: {g(f)} "
+                  f"{labels.get(g(f), 'not used by the game')}")
     c1, c2 = g("special_cond"), g("special_cond2")
     print(f"  who can join: rules {c1} ({GD.cond_name(c1)}), {c2} "
           f"({GD.cond_name(c2)}); board text {g('special_flag')}: "

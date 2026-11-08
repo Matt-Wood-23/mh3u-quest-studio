@@ -18,10 +18,12 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from questlib import __version__                       # noqa: E402
+from questlib import art                               # noqa: E402
 from questlib import gamedata as GD                    # noqa: E402
 from questlib import project as P                      # noqa: E402
 from questlib.dlc_pack import DlcPack, QuestFile, PackError  # noqa: E402
-from questlib.quest_format import Quest, QuestFormatError    # noqa: E402
+from questlib.quest_format import (Quest, QuestFormatError,  # noqa: E402
+                                   has_arena_block)
 from questlib.theme import apply_dark_theme, TK_DARK, MUTED, OK_FG, ERR_FG, ACCENT  # noqa: E402
 from questlib.widgets import QuestEditor               # noqa: E402
 
@@ -36,6 +38,22 @@ def quest_row_text(q):
                                                    if m["Num"] > 1 else "")
                      for m in q.monsters if m["Type"])
     return mons or "—"
+
+
+LIST_ICON_PX = 28
+
+
+def quest_icon(q):
+    """The first monster's icon for the quest list (a quest scroll when the
+    quest has no monsters), or '' when the game's pictures aren't found."""
+    em = next((m["Type"] for m in q.monsters if m["Type"] and m["Num"]), None)
+    icon = (art.ART.monster_icon(em, LIST_ICON_PX) if em
+            else art.ART.sheet_icon(art.SCROLL_CELL, LIST_ICON_PX))
+    return icon or ""
+
+
+def stars_text(n):
+    return "★" * max(0, min(n, 10))
 
 
 def donor_candidates(project, pack, em_id, quest_map):
@@ -60,6 +78,34 @@ def donor_candidates(project, pack, em_id, quest_map):
             out.append((not same_map, q.get("star"), label, m))
     out.sort(key=lambda t: (t[0], t[1]))
     return [(label, m) for _, _, label, m in out]
+
+
+def arena_quests(project):
+    """The base game's Grudge Match / Challenge quests: [(Quest, bytes)]."""
+    if project is None:
+        return []
+    out = []
+    for leaf, _ in project.quest_entries("quest00"):
+        data = project.pristine_data("quest00", leaf)
+        try:
+            q = Quest(data)
+        except QuestFormatError:
+            continue
+        if GD.arena_kind(q.get("quest_no")) and q.arena_sets:
+            out.append((q, data))
+    return out
+
+
+def arena_set_candidates(project):
+    """Every gear set of the base game's arena quests, for 'Copy set'."""
+    out = []
+    for q, _ in arena_quests(project):
+        for i, g in enumerate(q.arena_sets):
+            if g["equip"][0][1]:
+                out.append((f"#{q.get('quest_no'):05d} set {i + 1}  "
+                            f"{GD.arena_set_summary(g):<44} "
+                            f"{q.get_string('name')}", g))
+    return out
 
 
 # ================================================================== setup
@@ -209,13 +255,36 @@ class BaseTab(ttk.Frame):
         paned = ttk.PanedWindow(self, orient="horizontal")
         paned.pack(fill="both", expand=True)
         lf = ttk.Frame(paned)
+        # where the quest shows up in the game, and its rank
+        self.group = tk.StringVar(value="All")
+        self.rank = tk.StringVar(value="any")
+        filt = ttk.Frame(lf)
+        filt.pack(side="top", fill="x", pady=(0, 2))
+        self.group_btns = {}
+        for g in ("All", *GD.QUEST_GROUPS):
+            b = ttk.Radiobutton(filt, text=g, value=g, variable=self.group,
+                                style="Toolbutton", command=self.refresh_list)
+            b.pack(side="left", padx=(0, 2))
+            self.group_btns[g] = b
+        ranks = ttk.Frame(lf)
+        ranks.pack(side="top", fill="x", pady=(0, 6))
+        ttk.Label(ranks, text="Rank:", foreground=MUTED).pack(side="left",
+                                                             padx=(2, 6))
+        for v, t in (("any", "Any"), ("0", "Low"), ("1", "High"), ("2", "G")):
+            ttk.Radiobutton(ranks, text=t, value=v, variable=self.rank,
+                            style="Toolbutton", command=self.refresh_list
+                            ).pack(side="left", padx=(0, 2))
+        self.sort_col, self.sort_rev = "no", False
         cols = ("no", "star", "map", "name", "mons")
-        self.tree = ttk.Treeview(lf, columns=cols, show="headings",
-                                 selectmode="browse")
-        for c, w, t in (("no", 60, "No."), ("star", 36, "★"),
-                        ("map", 110, "Map"), ("name", 220, "Name"),
-                        ("mons", 170, "Monsters")):
-            self.tree.heading(c, text=t)
+        self.tree = ttk.Treeview(lf, columns=cols, show="tree headings",
+                                 selectmode="browse", style="Quests.Treeview")
+        self.tree.column("#0", width=44, stretch=False)    # monster icon
+        self.col_titles = {"no": "No.", "star": "Stars", "map": "Map",
+                           "name": "Name", "mons": "Monsters"}
+        for c, w in (("no", 52), ("star", 70), ("map", 110), ("name", 210),
+                     ("mons", 160)):
+            self.tree.heading(c, text=self.col_titles[c],
+                              command=lambda c=c: self._sort_by(c))
             self.tree.column(c, width=w, stretch=(c in ("name", "mons")))
         vsb = ttk.Scrollbar(lf, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
@@ -229,7 +298,8 @@ class BaseTab(ttk.Frame):
             paned, on_save=self._save, on_revert=self._revert,
             donors=lambda em, m: donor_candidates(self.project, "quest00",
                                                   em, m),
-            revert_label="Revert to original")
+            revert_label="Revert to original",
+            arena_donors=lambda: arena_set_candidates(self.project))
         paned.add(self.editor, weight=3)
 
     # project
@@ -239,11 +309,25 @@ class BaseTab(ttk.Frame):
         self.refresh_list()
         self.update_state()
 
+    def _sort_by(self, col):
+        """Click a column title to sort by it; click again to reverse."""
+        if self.sort_col == col:
+            self.sort_rev = not self.sort_rev
+        else:
+            self.sort_col, self.sort_rev = col, False
+        self.refresh_list(keep=(self.tree.selection() or [None])[0])
+
     def refresh_list(self, keep=None):
         self.tree.delete(*self.tree.get_children())
+        for c, t in self.col_titles.items():
+            arrow = (" ▼" if self.sort_rev else " ▲") if c == self.sort_col else ""
+            self.tree.heading(c, text=t + arrow)
         if not self.project:
             return
         pat = self.search.get().strip().lower()
+        group, rank = self.group.get(), self.rank.get()
+        counts = dict.fromkeys(("All", *GD.QUEST_GROUPS), 0)
+        rows = []
         for pack in P.PACKS:
             try:
                 entries = self.project.quest_entries(pack)
@@ -263,12 +347,27 @@ class BaseTab(ttk.Frame):
                 if pat and not any(pat in s.lower() for s in
                                    (name, mons, leaf)):
                     continue
-                iid = f"{pack}/{leaf}"
-                self.tree.insert(
-                    "", "end", iid=iid, tags=("mod",) if leaf in mods else (),
-                    values=(leaf[2:] + (" *" if leaf in mods else ""),
-                            q.get("star"), GD.map_name(q.get("map")), name,
-                            mons))
+                no = q.get("quest_no")
+                g = GD.quest_group(no)
+                if rank != "any" and GD.quest_rank(no) != int(rank):
+                    continue
+                counts["All"] += 1
+                counts[g] = counts.get(g, 0) + 1
+                if group != "All" and g != group:
+                    continue
+                vals = (leaf[2:] + (" *" if leaf in mods else ""),
+                        stars_text(q.get("star")),
+                        GD.map_name(q.get("map")), name, mons)
+                key = {"no": no, "star": q.get("star"), "map": vals[2],
+                       "name": name.lower(), "mons": mons.lower()}
+                rows.append((key[self.sort_col], no, f"{pack}/{leaf}",
+                             ("mod",) if leaf in mods else (), q, vals))
+        rows.sort(key=lambda r: (r[0], r[1]), reverse=self.sort_rev)
+        for _, _, iid, tags, q, vals in rows:
+            self.tree.insert("", "end", iid=iid, tags=tags,
+                             image=quest_icon(q), values=vals)
+        for g, b in self.group_btns.items():
+            b.config(text=f"{g}  {counts.get(g, 0)}")
         if keep and self.tree.exists(keep):
             self.tree.selection_set(keep)
             self.tree.see(keep)
@@ -395,22 +494,31 @@ class NewQuestDialog(tk.Toplevel):
     """Pick the event quest to copy, the new quest number and a name.
     result = (template bytes, quest_no, name) or None."""
 
-    def __init__(self, parent, templates, default_no, used, slot):
+    def __init__(self, parent, templates, default_no, used, slot,
+                 pack_name=""):
         super().__init__(parent)
         self.title("New event quest")
         self.configure(bg=TK_DARK["bg"])
-        self.geometry("680x440")
+        self.geometry("720x480")
         self.transient(parent)
         self.grab_set()
         self.result = None
         self.templates, self.used = templates, used
+        self.pack_name = pack_name
+        self.event_no = default_no
+        self.arena_no = next((n for n in GD.CHALLENGE_LISTED
+                              if n not in used), None)
         frm = ttk.Frame(self, padding=10)
         frm.pack(fill="both", expand=True)
-        ttk.Label(frm, wraplength=650, justify="left", foreground=MUTED, text=(
+        ttk.Label(frm, wraplength=690, justify="left", foreground=MUTED, text=(
             f"The new quest goes into empty slot {slot + 1}. It starts as a "
-            f"copy of the quest you pick (event quests carry data that "
+            f"copy of the quest you pick (event quests carry data that most "
             f"base-game quests don't, so the template has to be an event "
-            f"quest). Edit it afterwards like any other quest.")).pack(
+            f"quest or one of the base game's arena quests). Copy a Grudge "
+            f"Match or Challenge quest to make an arena quest with gear sets "
+            f"(Arena tab): it must go in the {GD.CHALLENGE_PACK} pack with a "
+            f"number from 61000–61009, the only Challenge Quests the game "
+            f"lists. Edit it afterwards like any other quest.")).pack(
             anchor="w")
         self.lb = tk.Listbox(frm, **TK_DARK)
         self.lb.pack(fill="both", expand=True, pady=8)
@@ -424,7 +532,8 @@ class NewQuestDialog(tk.Toplevel):
         ttk.Entry(g, textvariable=self.no, width=8).grid(row=0, column=1,
                                                         sticky="w", padx=6)
         ttk.Label(g, foreground=MUTED, text="unique; event quests use "
-                  "20xxx").grid(row=0, column=2, sticky="w")
+                  "20100–20399, Challenge Quests 61000–61009").grid(
+            row=0, column=2, sticky="w")
         ttk.Label(g, text="Name").grid(row=1, column=0, sticky="w", pady=4)
         self.name = tk.StringVar()
         ttk.Entry(g, textvariable=self.name, width=50).grid(
@@ -443,6 +552,10 @@ class NewQuestDialog(tk.Toplevel):
         if s:
             q = Quest(self.templates[s[0]][1])
             self.name.set(f"[NEW] {q.get_string('name')}")
+            if not GD.arena_kind(q.get("quest_no")):
+                self.no.set(str(self.event_no))
+            else:
+                self.no.set(str(self.arena_no) if self.arena_no else "")
 
     def _ok(self):
         s = self.lb.curselection()
@@ -460,7 +573,29 @@ class NewQuestDialog(tk.Toplevel):
             return
         if no in self.used:
             messagebox.showerror("Quest number", f"#{no} is already used in "
-                                 "these packs.", parent=self)
+                                 "these packs or the base game.", parent=self)
+            return
+        tq = Quest(self.templates[s[0]][1])
+        warn = None
+        arena = GD.arena_kind(tq.get("quest_no"))
+        if arena and no not in GD.CHALLENGE_LISTED:
+            warn = (f"The game lists only Challenge Quests 61000–61009, so "
+                    f"#{no} won't show up at the Arena Clerk."
+                    + ("" if self.arena_no else " All ten numbers are already "
+                       "used in these packs: edit or delete one of those "
+                       "Challenge quests instead."))
+        elif arena and self.pack_name and \
+                self.pack_name.lower() != GD.CHALLENGE_PACK:
+            warn = (f"Challenge Quests are read from the {GD.CHALLENGE_PACK} "
+                    f"pack; one in {self.pack_name} didn't show up in "
+                    f"testing. Open {GD.CHALLENGE_PACK} and create it there.")
+        elif tq.em_set_count and not has_arena_block(no):
+            warn = (f"The game reads this quest's placed small monsters only "
+                    f"for numbers 20100–20399 and 60000–69999; #{no} will "
+                    f"skip them.")
+        if warn and not messagebox.askyesno("Quest number", warn +
+                                            "\n\nUse it anyway?",
+                                            icon="warning", parent=self):
             return
         self.result = (self.templates[s[0]][1], no, self.name.get().strip())
         self.destroy()
@@ -507,8 +642,9 @@ class DlcTab(ttk.Frame):
         note.bind("<Configure>", lambda e: note.config(
             wraplength=max(200, e.width - 6)))
         cols = ("slot", "no", "name", "mons")
-        self.tree = ttk.Treeview(lf, columns=cols, show="headings",
-                                 selectmode="browse")
+        self.tree = ttk.Treeview(lf, columns=cols, show="tree headings",
+                                 selectmode="browse", style="Quests.Treeview")
+        self.tree.column("#0", width=44, stretch=False)    # monster icon
         for c, w, t in (("slot", 40, "Slot"), ("no", 55, "No."),
                         ("name", 200, "Name"), ("mons", 170, "Monsters")):
             self.tree.heading(c, text=t)
@@ -523,7 +659,8 @@ class DlcTab(ttk.Frame):
             paned, on_save=self._save, on_revert=self._revert,
             donors=lambda em, m: donor_candidates(self.app.project, "quest00",
                                                   em, m),
-            revert_label="Undo unsaved changes")
+            revert_label="Undo unsaved changes",
+            arena_donors=lambda: arena_set_candidates(self.app.project))
         paned.add(self.editor, weight=3)
 
     def _save_dirs(self):
@@ -601,7 +738,7 @@ class DlcTab(ttk.Frame):
         self.file_lbl.config(text=str(path), foreground=TK_DARK["fg"])
         self.tree.delete(*self.tree.get_children())
         for i, q in quests:
-            self.tree.insert("", "end", iid=str(i), values=(
+            self.tree.insert("", "end", iid=str(i), image=quest_icon(q), values=(
                 i + 1, q.get("quest_no"), q.get_string("name"),
                 quest_row_text(q)))
         self.app.status(f"Opened {Path(path).name}: {len(quests)} quest(s)")
@@ -628,7 +765,8 @@ class DlcTab(ttk.Frame):
         self.editor.load(
             data, f"#{q.get('quest_no'):05d}  {q.get_string('name')}",
             f"{self.pack.path.name} · slot {self.slot + 1} · "
-            f"{self.pack.file_name(self.slot)} · {GD.map_name(q.get('map'))}")
+            f"{self.pack.file_name(self.slot)} · {GD.map_name(q.get('map'))}",
+            pack=self.pack.path.name)
 
     def _save(self, data):
         try:
@@ -681,6 +819,12 @@ class DlcTab(ttk.Frame):
                                   f"{q.get_string('name')}  ({name} slot "
                                   f"{i + 1}, {GD.map_name(q.get('map'))})",
                                   p.record(i)))
+        # the base game's own arena quests are templates only: their numbers
+        # stay free, since the Challenge list shows only what quest4 holds
+        for q, data in arena_quests(self.app.project):
+            templates.append((f"#{q.get('quest_no'):05d}  "
+                              f"{q.get_string('name')}  (base game arena "
+                              f"quest, {GD.map_name(q.get('map'))})", data))
         if not templates:
             messagebox.showinfo("New quest", "A new event quest starts as a "
                                 "copy of an existing one, and there are none "
@@ -688,7 +832,7 @@ class DlcTab(ttk.Frame):
             return
         events = [n for n in used if 20000 <= n < 30000]
         dlg = NewQuestDialog(self, templates, (max(events) + 1) if events
-                             else 20325, used, empty[0])
+                             else 20325, used, empty[0], self.pack.path.name)
         self.wait_window(dlg)
         if not dlg.result:
             return
@@ -749,7 +893,11 @@ class App:
     def __init__(self, root):
         self.root = root
         root.title(f"MH3U Quest Studio {__version__}")
-        root.geometry("1280x820")
+        # roomy on big screens (the Monsters tab shows the map beside the
+        # cards), never bigger than the screen
+        root.geometry(f"{min(1560, root.winfo_screenwidth() - 80)}x"
+                      f"{min(940, root.winfo_screenheight() - 100)}")
+        root.minsize(1000, 600)    # narrower clips the editor tabs
         apply_dark_theme(root)
         self.cfg = P.Config(CONFIG)
         self.project = None
@@ -825,6 +973,10 @@ class App:
             messagebox.showerror("Game folder problem", str(e))
             self.status(str(e), error=True)
             return
+        # monster icons and maps come from these game files (decoded once,
+        # cached in the workspace)
+        art.setup([P.content_dir(p) for p in self.cfg.game_dirs], ws / "art",
+                  GD.DATA / "art_layout.json")
         self.game_lbl.config(text=f"Game: {self.cfg.game_dirs[0]}"
                                   + (f" (+{len(self.cfg.game_dirs) - 1})"
                                      if len(self.cfg.game_dirs) > 1 else "")
