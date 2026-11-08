@@ -9,7 +9,7 @@ No game files are included. You need your own copy of the game.
 
 It looks like the game: monster and item icons, quest scrolls, star ranks and the in-game area maps, read from your own game files the first time you open it (none of the game's art ships with the editor).
 
-![Monsters tab: each monster's icon and difficulty, and the area map with where the hunters, the monsters and possible invaders start](docs/studio_monsters.png)
+![Monsters tab: each monster's icon and difficulty, and the area map with where the hunters, the monsters and possible invaders start](docs/monsters_tab.png)
 
 ## What you can change
 
@@ -86,7 +86,7 @@ The Advanced section labels the intro cutscene, story step and multi-monster ord
 
 Open a pack from **Cemu save packs** (or **Open pack…**). The menu lists the packs of every Cemu it can find (the default install and any Cemu that's running), grouped by install folder. Pick the install you actually play on, since each Cemu has its own saves. A portable Cemu that isn't running can be added with **Add a Cemu folder…**. Edit a quest and click **Save quest**. The pack file is written straight away, and a `.BACKUP` copy is made the first time. Close the game before saving.
 
-![DLC tab with an event pack open](docs/studio_dlc.png)
+![DLC tab with an event pack open](docs/dlc_tab.png)
 
 **New quest…** creates a brand-new event quest in the pack's first empty slot. It starts as a copy of an event quest you pick and gets a new quest number; then edit it like any other. Each pack holds 20 quests, and `quest3` is often empty. The game lists new quest numbers, and other players can join them without having the quest themselves. **Delete quest** empties a slot.
 
