@@ -33,8 +33,9 @@ MON_SIZE = 11
 NANDO_FIELDS = ("Nando_hp", "Nando_at", "Nando_etc")
 NANDO_MAX = 127
 
-REWARD_SLOTS = 32          # per table; two tables (Reward1, Reward2)
+REWARD_SLOTS = 32          # per table; two tables (Reward1 = A, Reward2 = B)
 REWARD_REGION = REWARD_SLOTS * 4 * 2   # 256 bytes, fixed capacity
+REWARD_GIVEN = 8           # most rewards the game gives from one table
 
 # Clr_Pattern (how objective records A/B combine — DTI rQuestData names)
 CLR_PATTERNS = {0: "single", 1: "A and B", 2: "A or B"}
@@ -190,17 +191,19 @@ class Quest:
         scalar("nora_set_table", "B")
         scalar("nora_pekko", "B")
 
-        # Reward region: FIXED 256 bytes = Reward1 (32 x 4B slots) then
-        # Reward2 (32 x 4B). Slot = [item u16][num u8][per u8]; each table's
-        # live list ends at the first id==0 slot (bytes after that may be
-        # stale build leftovers — preserved, never re-serialized).
+        # Reward region: FIXED 256 bytes = 64 x 4B slots holding the two
+        # tables INTERLEAVED: even slots = Reward1 (table A), odd slots =
+        # Reward2 (table B). The game's reader (0x02076F2C) reads slot pairs
+        # into Reward1[i] (+0x290) and Reward2[i] (+0x310), i = 0..31.
+        # Slot = [item u16][num u8][per u8]; each table ends at its own first
+        # id==0 slot (every game quest: no line after a gap, totals 100 %).
         self._rewards_start = pos
         if pos + REWARD_REGION + 94 > len(d):
             raise QuestFormatError(
                 f"record too short for reward+tail cluster "
                 f"({len(d)} bytes, tail starts {pos})")
-        self.reward1 = self._parse_reward_table(pos)
-        self.reward2 = self._parse_reward_table(pos + REWARD_SLOTS * 4)
+        self.reward1, self.reward1_after_gap = self._parse_reward_table(1)
+        self.reward2, self.reward2_after_gap = self._parse_reward_table(2)
         pos += REWARD_REGION
 
         # money / settings / zako / objective cluster: fixed offsets from
@@ -283,15 +286,25 @@ class Quest:
               self._ac_off + (i + 1) * ARENA_SET_SIZE])) for i in range(na)]
         self.arena_end = end
 
-    def _parse_reward_table(self, start):
-        recs = []
+    def _reward_slot(self, table, i):
+        """Byte offset of line i (0-31) of reward table 1 (A) or 2 (B)."""
+        return self._rewards_start + (2 * i + table - 1) * 4
+
+    def _parse_reward_table(self, table):
+        """(lines, lines after the first gap). The table ends at its first
+        empty line; lines after it are kept apart (warned about, cleared on
+        save) — no game quest has any."""
+        lines, after, gap = [], [], False
         for i in range(REWARD_SLOTS):
-            iid, num, per = struct.unpack_from("<HBB", self.data,
-                                               start + i * 4)
-            if iid == 0 or iid == 5 and num == 0 and per == 0:
-                break
-            recs.append((iid, num, per))
-        return recs
+            rec = struct.unpack_from("<HBB", self.data,
+                                     self._reward_slot(table, i))
+            if rec[0] == 0:
+                gap = True
+            elif gap:
+                after.append(rec)
+            else:
+                lines.append(rec)
+        return lines, after
 
     # ----------------------------------------------------------- getters
 
@@ -346,33 +359,59 @@ class Quest:
         self.monsters[slot] = dict(zip(MON_FIELDS, bytes(MON_SIZE)))
 
     def reward_capacity(self):
-        """Slots per table (fixed regions)."""
+        """Lines per table (fixed region, tables interleaved)."""
         return REWARD_SLOTS
 
+    def reward_problems(self):
+        """Warnings about the reward tables, as text lines.
+
+        The game's roll (0x02170F2C, called per table by 0x02171690) walks a
+        table up to its first empty line: every 0 % line is given as a fixed
+        reward, then up to REWARD_GIVEN rewards in all are rolled, each pick
+        = rand % (the table's total) walked through the chances."""
+        out = []
+        for name, lines, after in (("A", self.reward1, self.reward1_after_gap),
+                                   ("B", self.reward2, self.reward2_after_gap)):
+            if after:
+                out.append(f"Reward table {name}: {len(after)} line(s) after "
+                           f"an empty line are never given (the game stops "
+                           f"at the first empty line). Changing the table "
+                           f"clears them.")
+            fixed = sum(1 for _, _, p in lines if p == 0)
+            if fixed > REWARD_GIVEN:
+                out.append(f"Reward table {name} has {fixed} lines at 0 % "
+                           f"(always given), but the game has room for "
+                           f"{REWARD_GIVEN} rewards per table: the extra "
+                           f"ones overwrite other rewards.")
+            total = sum(p for _, _, p in lines)
+            if total and total != 100:
+                out.append(f"Reward table {name} adds up to {total} %: the "
+                           f"game picks out of the total, so each line's real "
+                           f"chance is its value / {total} (the game's own "
+                           f"quests use 100 %).")
+        return out
+
     def set_reward_table(self, table, records):
-        """table: 1 or 2. Writes the records into the table's fixed 32-slot
-        region; zeroes any slots the old list used beyond the new length
-        (stale bytes past the old terminator are left untouched)."""
+        """table: 1 (A, even slots) or 2 (B, odd slots). Writes the records
+        into the table's 32 lines and zeroes every line after them, which
+        also clears lines left after an earlier gap."""
         if table not in (1, 2):
             raise QuestFormatError("table must be 1 or 2")
-        records = list(records)
+        records = [tuple(r) for r in records]
         if len(records) > REWARD_SLOTS:
             raise QuestFormatError(
                 f"{len(records)} reward records > {REWARD_SLOTS} slots")
-        old = self.reward1 if table == 1 else self.reward2
-        start = self._rewards_start + (table - 1) * REWARD_SLOTS * 4
-        for i, (iid, n, p) in enumerate(records):
-            struct.pack_into("<HBB", self.data, start + i * 4, iid, n, p)
-        if len(records) != len(old):
-            # zero removed slots and/or the terminator slot after the list
-            lo = len(records) * 4
-            hi = max(len(old) * 4, min(len(records) + 1, REWARD_SLOTS) * 4)
-            for i in range(lo, hi):
-                self.data[start + i] = 0
+        if any(r[0] == 0 for r in records):
+            raise QuestFormatError("a reward line has item id 0 (that "
+                                   "would end the table early)")
+        for i in range(REWARD_SLOTS):
+            rec = records[i] if i < len(records) else (0, 0, 0)
+            struct.pack_into("<HBB", self.data, self._reward_slot(table, i),
+                             *rec)
         if table == 1:
-            self.reward1 = records
+            self.reward1, self.reward1_after_gap = records, []
         else:
-            self.reward2 = records
+            self.reward2, self.reward2_after_gap = records, []
 
     def set_arena_set(self, i, gear):
         """Overwrite gear set i (a dict like unpack_arena_set returns)."""

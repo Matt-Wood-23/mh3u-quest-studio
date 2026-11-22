@@ -20,7 +20,7 @@ It looks like the game: monster and item icons, quest scrolls, star ranks and th
 - **Invaders**: whether the area is unstable, the chance of invaders, how many, and which of the game's invader lists to use (each list shows its monsters, their odds and strength, and the quests that use it). It warns about invaders that can't spawn on the quest's map. On a quest with a Qurupeco, its call brings the invader in.
 - **Objective**: hunt, capture, slay or deliver, with the target and count. A quest holds two targets at most; **Hunt all large monsters** sets up a 3–5 monster hunt the way the game's own quests do (the last one or two monsters as targets, with the monster order set).
 - **Monsters**: up to 5 large monsters. Pick the species, count, size and difficulty, how much the size varies, where it starts and its stamina (see below). **Copy from quest…** clones a monster from any base quest, which is the safest way to add one.
-- **Rewards**: both reward columns, up to 32 items each.
+- **Rewards**: reward tables A and B, up to 32 items each, with each table's total chance.
 - **Arena**: on arena quests, the S and A rank clear times and the 5 gear sets the player picks from: weapon, armor, talisman and its two skills, item pouch and ammo pouch (see [Arena quests](#arena-quests)).
 - **Flags**: the quest's Category bit field.
 

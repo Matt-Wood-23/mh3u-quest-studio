@@ -8,6 +8,7 @@ from . import gamedata as GD
 from .quest_format import (Quest, QuestFormatError, MON_FIELDS, MON_SLOTS,
                            LANGS, STRING_FIELDS, OBJ_TYPES, CLR_PATTERNS,
                            NANDO_FIELDS, NANDO_MAX, REWARD_SLOTS,
+                           REWARD_GIVEN,
                            ARENA_SLOT_TYPE, skill_points, skill_raw)
 from .theme import TK_DARK, MUTED, ACCENT, OK_FG, ERR_FG, BG, BORDER, FG
 from . import art
@@ -452,8 +453,8 @@ class ItemPickDialog(tk.Toplevel):
             ttk.Spinbox(nf, from_=0, to=100, textvariable=self.per_var,
                         width=5).pack(side="left", padx=2)
             ttk.Label(frm, foreground=MUTED, wraplength=400, justify="left",
-                      text="Chance is the item's weight in its reward column; "
-                           "the game's own quests give fixed rewards with 0."
+                      text="Chance is the item's weight in its reward table. "
+                           "A line at 0 is always given (a fixed reward)."
                       ).grid(row=4, column=0, columnspan=3, sticky="w", pady=4)
 
         bf = ttk.Frame(frm)
@@ -515,7 +516,11 @@ class ItemPickDialog(tk.Toplevel):
 
 
 class RewardTable(ttk.Frame):
-    """Reward column 1 / column 2 editor over quest_format reward tuples."""
+    """Reward table A / table B editor over quest_format reward tuples.
+    (The file interleaves the two tables line by line; quest_format handles
+    that, this widget only sees the two lists.)"""
+
+    NAMES = {1: "A", 2: "B"}
 
     COLS = ("col", "item", "num", "per")
 
@@ -525,7 +530,7 @@ class RewardTable(ttk.Frame):
                                  height=16, selectmode="browse",
                                  style="Items.Treeview")
         self.tree.column("#0", width=40, stretch=False)     # item icon
-        for c, w, t in (("col", 70, "Column"), ("item", 260, "Item"),
+        for c, w, t in (("col", 70, "Table"), ("item", 260, "Item"),
                         ("num", 60, "Amount"), ("per", 70, "Chance %")):
             self.tree.heading(c, text=t)
             self.tree.column(c, width=w, stretch=(c == "item"))
@@ -537,18 +542,25 @@ class RewardTable(ttk.Frame):
         self.columnconfigure(0, weight=1)
         bf = ttk.Frame(self)
         bf.grid(row=1, column=0, columnspan=2, sticky="w", pady=6)
-        ttk.Button(bf, text="Add to column 1…",
+        ttk.Button(bf, text="Add to table A…",
                    command=lambda: self._add(1)).pack(side="left", padx=2)
-        ttk.Button(bf, text="Add to column 2…",
+        ttk.Button(bf, text="Add to table B…",
                    command=lambda: self._add(2)).pack(side="left", padx=2)
         ttk.Button(bf, text="Edit…", command=self._edit).pack(side="left",
                                                               padx=(12, 2))
         ttk.Button(bf, text="Remove", command=self._remove).pack(side="left",
                                                                  padx=2)
         self.tree.bind("<Double-Button-1>", lambda e: self._edit())
+        self.totals = ttk.Label(bf)
+        self.totals.pack(side="left", padx=(16, 2))
         autowrap(ttk.Label(self, foreground=MUTED, justify="left",
-                  text=f"The two reward columns on the quest-clear screen. "
-                       f"Each column holds up to {REWARD_SLOTS} entries.")
+                  text=f"The quest's two reward tables, up to "
+                       f"{REWARD_SLOTS} lines each. From each table the game "
+                       f"gives every line at 0 % (fixed rewards), then picks "
+                       f"more by chance, up to {REWARD_GIVEN} rewards per "
+                       f"table. The game's own quests make each table's "
+                       f"chances add up to 100 % and put the monsters' "
+                       f"materials in table A, other items in table B.")
                  ).grid(row=2, column=0, columnspan=2, sticky="we")
         self.r = {1: [], 2: []}
 
@@ -565,7 +577,17 @@ class RewardTable(ttk.Frame):
             for i, (iid, num, per) in enumerate(self.r[col]):
                 self.tree.insert("", "end", iid=f"{col}:{i}",
                                  image=item_image(iid), values=(
-                    f"{col}", f"{GD.item_name(iid)}  ({iid})", num, per))
+                    self.NAMES[col], f"{GD.item_name(iid)}  ({iid})", num,
+                    per))
+        parts, off = [], False
+        for col in (1, 2):
+            if self.r[col]:
+                total = sum(p for _, _, p in self.r[col])
+                parts.append(f"{self.NAMES[col]}: {total} %")
+                off = off or total != 100
+        self.totals.configure(text="Totals  " + "   ".join(parts)
+                              if parts else "",
+                              foreground=ERR_FG if off else OK_FG)
         if select and self.tree.exists(select):
             self.tree.selection_set(select)
             self.tree.see(select)
@@ -579,10 +601,10 @@ class RewardTable(ttk.Frame):
 
     def _add(self, col):
         if len(self.r[col]) >= REWARD_SLOTS:
-            messagebox.showwarning("Full", f"Column {col} already has "
-                                   f"{REWARD_SLOTS} entries", parent=self)
+            messagebox.showwarning("Full", f"Table {self.NAMES[col]} already "
+                                   f"has {REWARD_SLOTS} lines", parent=self)
             return
-        dlg = ItemPickDialog(self, f"Add reward (column {col})")
+        dlg = ItemPickDialog(self, f"Add reward (table {self.NAMES[col]})")
         self.wait_window(dlg)
         if dlg.result:
             self.r[col].append(dlg.result)
@@ -2457,6 +2479,7 @@ class QuestEditor(ttk.Frame):
                 q.get("supp_time_flag"), q.get("hagi_no"),
                 q.get("supp_enemy_type"), q.get("supp_enemy_num"),
                 q.get("time_min"))[1]
+            + q.reward_problems()
             + GD.text_problems(q) + GD.arena_problems(q, self.pack_name))
 
     def _monster_warnings(self, q):

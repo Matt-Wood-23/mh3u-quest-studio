@@ -18,7 +18,7 @@ Examples:
   quest_cli.py edit 2906 --name "My Hunt" --time 25 \\
       --mon "1:Type=Great Jaggi,Num=2,Nando_hp=40"
   quest_cli.py edit 2906 --copy-mon 2:1206          (clone a monster block)
-  quest_cli.py edit 2906 --reward1 "9:3:0,311:2:25"  (id:amount:chance)
+  quest_cli.py edit 2906 --reward1 "9:3:0,311:2:25"  (table A; id:amount:chance)
   quest_cli.py edit 60000 --category 0x08010001      (flags, hex)
   quest_cli.py edit 11501 --invader-chance 100 --invader-max 2 --invader-list 76
 """
@@ -98,10 +98,13 @@ def show(q):
                   f"; stamina {GD.stamina_choice(m['Stamina'])}")
             for p in GD.monster_problems(i, m, g("map")):
                 print(f"WARNING: {p}")
-    for col, recs in ((1, q.reward1), (2, q.reward2)):
+    for col, recs in (("A", q.reward1), ("B", q.reward2)):
         txt = ", ".join(f"{GD.item_name(i)} x{n}" + (f" ({p}%)" if p else "")
                         for i, n, p in recs)
-        print(f"  rewards {col}: {txt or '-'}")
+        total = f" [{sum(p for _, _, p in recs)}%]" if recs else ""
+        print(f"  rewards {col}{total}: {txt or '-'}")
+    for w in q.reward_problems():
+        print(f"WARNING: {w}")
     print(f"  objective: {q.objective_text(GD.mon_name, GD.item_name)}")
     print(f"  money: fee {g('contract')}z  reward {g('reward_money')}z  "
           f"penalty {g('penalty')}z  HRP {g('main_hrp')}/{g('failure_hrp')}")
@@ -367,8 +370,10 @@ def main():
                    help=f"slot 1-5; fields {', '.join(MON_FIELDS)}")
     p.add_argument("--copy-mon", action="append", metavar="SLOT:QUEST[:SRC]")
     p.add_argument("--clear-mon", action="append", type=int, metavar="SLOT")
-    p.add_argument("--reward1", metavar="id:amount:chance,...")
-    p.add_argument("--reward2", metavar="id:amount:chance,...")
+    p.add_argument("--reward1", metavar="id:amount:chance,...",
+                   help="reward table A (replaces it)")
+    p.add_argument("--reward2", metavar="id:amount:chance,...",
+                   help="reward table B (replaces it)")
     p.set_defaults(fn=cmd_edit)
 
     p = sub.add_parser("invaders")
