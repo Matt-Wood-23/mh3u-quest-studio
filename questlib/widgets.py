@@ -41,7 +41,8 @@ ADVANCED_FIELDS = [
 # Advanced dropdowns (field, hint); each value is labelled with the game's
 # own quest that uses it.
 ADVANCED_ENUMS = [
-    ("demo_no", "first-meeting intro, shown until the save has seen it"),
+    ("demo_no", "loads a first-meeting intro; the game picks which intro "
+                "plays by quest number, so on a new quest this shows nothing"),
     ("prog_no", "Moga story quests only"),
     ("ren_pattern", "checked each time a large monster goes down (6 and up "
                     "wait until two are down); copy it from a quest with the "
