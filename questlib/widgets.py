@@ -904,6 +904,7 @@ class QuestEditor(ttk.Frame):
         self.arena_donors = arena_donors    # () -> [(label, gear set)]
         self.arena_work = []                # gear sets being edited
         self.pack_name = None               # event pack file name, if any
+        self.slot_problems = ()             # warnings about the quest's slot
         self.arena_cur = 0
         self.base = None        # bytes as loaded (for dirty checks)
         self.q = None
@@ -1680,12 +1681,14 @@ class QuestEditor(ttk.Frame):
         self.msg.config(text="")
         self.set_enabled(False)
 
-    def load(self, data, title, subtitle="", pack=None):
-        """`pack` is the event pack's file name (None for base-game quests)."""
+    def load(self, data, title, subtitle="", pack=None, slot_problems=()):
+        """`pack` is the event pack's file name (None for base-game quests);
+        `slot_problems` are save warnings about where the quest sits in it."""
         self._loading = True
         self.base = bytes(data)
         self.q = Quest(data)
         self.pack_name = pack
+        self.slot_problems = tuple(slot_problems)
         self.header.config(text=title)
         self.subheader.config(text=subtitle)
         q = self.q
@@ -2480,7 +2483,9 @@ class QuestEditor(ttk.Frame):
                 q.get("supp_enemy_type"), q.get("supp_enemy_num"),
                 q.get("time_min"))[1]
             + q.reward_problems()
-            + GD.text_problems(q) + GD.arena_problems(q, self.pack_name))
+            + GD.text_problems(q) + GD.arena_problems(q)
+            + GD.pack_problem(q.get("quest_no"), self.pack_name)
+            + list(self.slot_problems))
 
     def _monster_warnings(self, q):
         out = GD.legality_warnings(

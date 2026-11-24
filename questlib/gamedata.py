@@ -913,6 +913,19 @@ GRUDGE_LISTED = range(60000, 60012)
 CHALLENGE_LISTED = range(61000, 61010)
 CHALLENGE_PACK = "quest4"
 ARENA_B_RANK = 1800              # the game adds a fixed B rank of 30:00
+# The save folder's event packs. The Event Quests list reads quest1 and quest3
+# only, when the game starts; quest2 is never read. In each pack it counts the
+# filled slots (N) and reads slots 1..N, so a quest after an empty slot can
+# fall past the end and not show.
+SAVE_PACKS = ("quest1", "quest2", "quest3", "quest4")
+EVENT_PACKS = ("quest1", "quest3")
+UNREAD_PACK = "quest2"
+PACK_ROLES = {"quest1": "event quests", "quest2": "not read by the game",
+              "quest3": "event quests", "quest4": "Arena Challenge quests"}
+# Number blocks the community event quests use (Capcom's own are 20102-20104,
+# 20201-20210 and 20302-20324).
+COMMUNITY_BLOCKS = ((20150, 20199, "low rank"), (20250, 20299, "high rank"),
+                    (20350, 20399, "G rank"))
 
 
 def equip_name(etype, eid):
@@ -973,14 +986,41 @@ def arena_pack_problem(quest_no, pack):
     return []
 
 
-def arena_problems(q, pack=None):
-    """Gear-set checks for the save dialog. `pack` is the event pack's file
-    name, or None for a base-game quest."""
+def pack_problem(quest_no, pack):
+    """Why a quest in this event pack won't show up in the game, or [].
+    `pack` is the pack's file name; loose .quest files and packs under other
+    names only get the arena checks."""
+    if not pack:
+        return []
+    arena = arena_pack_problem(quest_no, pack)
+    if arena or quest_no in CHALLENGE_LISTED:
+        return arena
+    p = pack.lower()
+    if p == UNREAD_PACK:
+        return [f"the game never reads the {UNREAD_PACK} pack, so #{quest_no} "
+                f"won't show up; move it to quest1 or quest3"]
+    if p == CHALLENGE_PACK:
+        return [f"{CHALLENGE_PACK} only feeds the Arena's Challenge list "
+                f"(61000–61009), so #{quest_no} won't show up; event quests "
+                f"go in quest1 or quest3"]
+    return []
+
+
+def community_block(quest_no):
+    """The rank block a community event quest number is in, or None."""
+    for lo, hi, rank in COMMUNITY_BLOCKS:
+        if lo <= quest_no <= hi:
+            return rank
+    return None
+
+
+def arena_problems(q):
+    """Gear-set checks for the save dialog (pack_problem covers which pack
+    an arena quest has to be in)."""
     out = []
     no = q.get("quest_no")
     if not q.arena_sets:
         return out
-    out += arena_pack_problem(no, pack)
     kind = arena_kind(no)
     filled = [i for i, g in enumerate(q.arena_sets)
               if any(v for p in g["equip"] for v in p)]

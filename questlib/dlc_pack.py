@@ -9,6 +9,10 @@ Pack layout (0x29024 bytes):
   ...     zero tail
 Empty slots are all zeros. The quest records use the same format as the
 base-game quests (quest_format.Quest).
+
+The game counts a pack's filled slots (N) and reads only slots 1..N, so the
+quests have to sit together from slot 1: a quest after an empty slot can fall
+past the end and not show (gamedata.EVENT_PACKS has which packs it reads).
 """
 import shutil
 from pathlib import Path
@@ -80,6 +84,51 @@ class DlcPack:
     def empty_slots(self):
         return [i for i in range(SLOTS) if not self.has_quest(i)]
 
+    def unread_slots(self):
+        """Filled slots the game skips: it reads only as many slots from the
+        top as the pack has quests, so a gap pushes the last ones out."""
+        filled = [i for i in range(SLOTS) if self.has_quest(i)]
+        return [i for i in filled if i >= len(filled)]
+
+    def close_gaps(self):
+        """Move each quest up into the empty slots before it, keeping their
+        order. A slot moves unchanged (record and file name). Returns
+        {old slot: new slot} for the quests that moved."""
+        moved, n = {}, 0
+        for i in range(SLOTS):
+            if not self.has_quest(i):
+                continue
+            if i != n:
+                src, dst = self._off(i), self._off(n)
+                self.data[dst:dst + SLOT] = self.data[src:src + SLOT]
+                self.data[src:src + SLOT] = bytes(SLOT)
+                moved[i] = n
+            n += 1
+        return moved
+
+    def slot_bytes(self, i):
+        """A whole slot (record and file name), for moving it to another
+        pack."""
+        o = self._off(i)
+        return bytes(self.data[o:o + SLOT])
+
+    def put_slot(self, raw):
+        """Copy a slot from slot_bytes() into the first empty slot; returns
+        that slot."""
+        if len(raw) != SLOT or raw[:4] != b"QTDS":
+            raise PackError("not a quest slot")
+        empty = self.empty_slots()
+        if not empty:
+            raise PackError(f"{self.path.name} has no empty slot")
+        o = self._off(empty[0])
+        self.data[o:o + SLOT] = raw
+        return empty[0]
+
+    def export_record(self, i):
+        """The bare quest record, without the slot's zero padding and file
+        name: what a loose q_NNNNN.quest file holds."""
+        return self.record(i).rstrip(b"\0")
+
     def create_quest(self, slot, template, quest_no):
         """Fill an empty slot with a copy of an event-quest record under a
         new quest number (file name q_NNNNN.quest). Use an existing EVENT
@@ -134,6 +183,9 @@ class QuestFile:
 
     def quests(self):
         return [(0, Quest(self.data))]
+
+    def export_record(self, i=0):
+        return self.data.rstrip(b"\0")
 
     def file_name(self, i=0):
         return self.path.name

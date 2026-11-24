@@ -3,7 +3,7 @@
 A quest editor for **Monster Hunter 3 Ultimate (Wii U)** running in Cemu. It edits:
 
 - **Base-game quests**: the 412 Moga Village and Port Tanzia quests in `quest00.arc` / `quest01.arc`, US and EU.
-- **DLC / event quests**: the `quest1`–`quest4` event packs in Cemu's save folder, and loose `.quest` files.
+- **DLC / event quests**: the `quest1`–`quest4` event packs in Cemu's save folder, and loose `.quest` files. The game lists event quests from `quest1` and `quest3` (see [Which packs the game reads](#which-packs-the-game-reads)).
 
 No game files are included. You need your own copy of the game.
 
@@ -88,7 +88,17 @@ Open a pack from **Cemu save packs** (or **Open pack…**). The menu lists the p
 
 ![DLC tab with an event pack open](docs/dlc_tab.png)
 
-**New quest…** creates a brand-new event quest in the pack's first empty slot. It starts as a copy of an event quest you pick and gets a new quest number; then edit it like any other. Each pack holds 20 quests, and `quest3` is often empty. The game lists new quest numbers, and other players can join them without having the quest themselves. **Delete quest** empties a slot.
+**New quest…** creates a brand-new event quest in the pack's first empty slot. It starts as a copy of an event quest you pick and gets a new quest number; then edit it like any other. Each pack holds 20 quests. The game lists new quest numbers, and other players can join them without having the quest themselves.
+
+### Which packs the game reads
+
+- **Event quests go in `quest1` or `quest3`.** The Event Quests list reads only those two. The game never reads `quest2`, and `quest4` is the Arena's Challenge list (see below). The menu says what each pack is for, and **New quest…** refuses `quest2`.
+- **Keep the quests together from slot 1.** The game reads as many slots from the top as the pack has quests, so a quest after an empty slot can be left out. **Delete quest** moves the quests after it up a slot. When an opened pack has a gap, the editor offers to close it.
+- **The game reads the packs when it starts.** Restart the game to see a change.
+
+Quests the game won't list are shown in red, and the save check says why. **Move to** puts the selected quest, unchanged, in another pack: use it to move quests out of `quest2`.
+
+**Export quest…** saves the selected quest as a single `q_<number>.quest` file, to send in an event quest without zipping the whole pack. It warns when the number isn't in the blocks community event quests use: 20150–20199 low rank, 20250–20299 high rank, 20350–20399 G rank.
 
 ### Arena quests
 
