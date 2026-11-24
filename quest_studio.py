@@ -643,9 +643,9 @@ class DlcTab(ttk.Frame):
         note = ttk.Label(lf, foreground=MUTED, justify="left", wraplength=380,
                          text="Event quest packs live in Cemu's save folder as "
                               "quest1..quest4. The game's Event Quests list "
-                              "reads quest1 and quest3 only, when the game "
-                              "starts; quest2 is never read, and quest4 holds "
-                              "the Arena's Challenge Quests. The game reads as "
+                              "reads quest1, quest2 and quest3 when the game "
+                              "starts, and quest4 holds the Arena's Challenge "
+                              "Quests. The game reads as "
                               "many slots from the top as a pack has quests, "
                               "so keep them together from slot 1 (Delete "
                               "quest moves the later ones up). Saving writes "
@@ -752,6 +752,9 @@ class DlcTab(ttk.Frame):
         except (PackError, QuestFormatError, OSError) as e:
             messagebox.showerror("Can't open", f"{path}\n\n{e}")
             return
+        offered_fix = False          # True when the player kept a copy unfixed
+        if check and isinstance(pack, DlcPack) and pack.copied_from():
+            offered_fix = not self._offer_fix_copy(pack, quests)
         if check and isinstance(pack, DlcPack) and self._offer_close_gaps(
                 pack, quests):
             quests = pack.quests()
@@ -770,9 +773,55 @@ class DlcTab(ttk.Frame):
                         + (f"; {n} won't show up in the game (shown in red)"
                            if n else ""), error=bool(n))
         if not quests:
-            messagebox.showinfo("Empty", "This pack has no quests in it.")
-        elif check:
+            if not offered_fix:
+                messagebox.showinfo("Empty", "This pack has no quests in it.")
+        elif check and not offered_fix:
             self._explain_unseen(quests)
+
+    def _offer_fix_copy(self, pack, quests):
+        """The pack is a renamed copy of another (its header still names that
+        file), so the game skips it. Offer to give it its own name hash."""
+        name, src = pack.path.name, pack.copied_from()
+        mine = {q.get("quest_no") for _, q in quests}
+        dupes = {}
+        for n in GD.EVENT_PACKS:
+            p = pack.path.with_name(n)
+            if p == pack.path or not p.exists():
+                continue
+            try:
+                other = DlcPack(p)
+                if other.copied_from():
+                    continue
+                same = sorted(mine & {q.get("quest_no") for _, q in
+                                      other.quests()})
+            except (PackError, QuestFormatError, OSError):
+                continue
+            if same:
+                dupes[n] = same
+        text = (GD.copy_problem(name, src)
+                + (f": none of its {len(quests)} quest(s) show up."
+                   if quests else ".")
+                + f"\n\nFix the header so the game reads {name}?")
+        if dupes:
+            text += ("\n\nCareful: " + "; ".join(
+                f"{len(v)} of its quest numbers are also in {n}"
+                for n, v in dupes.items())
+                + ". The game may list those twice. To keep only one "
+                  "copy, answer No and delete or move quests first, or fix "
+                  "it and then delete the duplicates here.")
+        if not messagebox.askyesno("Pack is a renamed copy", text,
+                                   icon="warning"):
+            return False
+        pack.fix_name_hash()
+        try:
+            pack.save()
+        except OSError as e:
+            messagebox.showerror("Save failed", str(e))
+            pack.data = bytearray(pack.path.read_bytes())
+            return False
+        self.app.status(f"Fixed the header of {name}; the game reads it now "
+                        f"(restart the game to see it)")
+        return True
 
     def _gap_text(self, no):
         return (f"#{no} sits after an empty slot, and the game stops reading "
@@ -780,10 +829,10 @@ class DlcTab(ttk.Frame):
                 f"show up; reopen the pack to close the gap")
 
     def _gaps_matter(self, pack):
-        """quest2 is never read, and the Challenge list (quest4) wasn't
-        tested with gaps."""
-        return pack.path.name.lower() not in (GD.UNREAD_PACK,
-                                              GD.CHALLENGE_PACK)
+        """The Challenge list (quest4) wasn't tested with gaps, and the game
+        skips a renamed copy whole."""
+        return (pack.path.name.lower() != GD.CHALLENGE_PACK
+                and not pack.copied_from())
 
     def _offer_close_gaps(self, pack, quests):
         """Ask to move the quests up when the game won't reach some of them.
@@ -818,8 +867,10 @@ class DlcTab(ttk.Frame):
         self.unseen, self.gap_slots = {}, set()
         if isinstance(self.pack, DlcPack):
             name = self.pack.path.name
+            src = self.pack.copied_from()
             for i, q in quests:
-                why = GD.pack_problem(q.get("quest_no"), name)
+                why = ([GD.copy_problem(name, src)] if src else
+                       GD.pack_problem(q.get("quest_no"), name))
                 if why:
                     self.unseen[i] = why[0]
             if self._gaps_matter(self.pack):
@@ -841,18 +892,14 @@ class DlcTab(ttk.Frame):
         if not rows:
             return
         name = self.pack.path.name
-        if name.lower() == GD.UNREAD_PACK:
-            text = (f"The game never reads {name}, so the {len(rows)} "
-                    f"quest(s) in it won't show up.")
-        else:
-            text = f"These quests in {name} won't show up in the game:\n\n" \
-                   + "\n".join(f"• slot {i + 1}: {self.unseen[i]}"
-                               for i, _ in rows[:10]) \
-                   + ("\n• …" if len(rows) > 10 else "")
+        text = f"These quests in {name} won't show up in the game:\n\n" \
+               + "\n".join(f"• slot {i + 1}: {self.unseen[i]}"
+                           for i, _ in rows[:10]) \
+               + ("\n• …" if len(rows) > 10 else "")
         messagebox.showinfo(
             "Quests the game won't list", text + "\n\nSelect one and pick "
-            "a pack under Move to: quest1 or quest3 for event quests, quest4 "
-            "for Challenge Quests 61000–61009.")
+            "a pack under Move to: quest1, quest2 or quest3 for event "
+            "quests, quest4 for Challenge Quests 61000–61009.")
 
     def _selected(self):
         sel = self.tree.selection()
@@ -879,7 +926,7 @@ class DlcTab(ttk.Frame):
                else ""),
             pack=self.pack.path.name,
             slot_problems=[self.unseen[self.slot]]
-            if self.slot in self.gap_slots else ())
+            if self.slot in self.gap_slots or self.pack.copied_from() else ())
 
     def _save(self, data):
         try:
@@ -914,21 +961,23 @@ class DlcTab(ttk.Frame):
 
     def new_quest(self):
         if not isinstance(self.pack, DlcPack):
-            messagebox.showinfo("New quest", "Open a quest pack (quest1 or "
-                                             "quest3) first.")
+            messagebox.showinfo("New quest", "Open a quest pack (quest1, "
+                                             "quest2 or quest3) first.")
             return
-        if self.pack.path.name.lower() == GD.UNREAD_PACK:
-            messagebox.showinfo("New quest", f"The game never reads "
-                                f"{GD.UNREAD_PACK}, so a quest made there "
-                                "won't show up. Open quest1 or quest3 (Cemu "
-                                "save packs menu) and create it there.")
+        src = self.pack.copied_from()
+        if src:
+            name = self.pack.path.name
+            messagebox.showinfo("New quest", f"{GD.copy_problem(name, src)}. "
+                                "A quest made there won't show up. Open "
+                                f"{name} again and let Quest Studio fix its "
+                                "header, or use another pack.")
             return
         empty = self.pack.empty_slots()
         if not empty:
             messagebox.showinfo("Pack full", f"{self.pack.path.name} has no "
-                                "empty slot. Delete a quest first, or use the "
-                                "other event pack: the game lists quest1 and "
-                                "quest3.")
+                                "empty slot. Delete a quest first, or use "
+                                "another event pack: the game lists quest1, "
+                                "quest2 and quest3.")
             return
         if not self.app.confirm_discard(self.editor):
             return
@@ -998,8 +1047,7 @@ class DlcTab(ttk.Frame):
                                            f"moved up a slot" if moved else ""))
 
     def _fill_move(self):
-        """The packs next to the open one that the selected quest can go to
-        (never quest2, which the game doesn't read)."""
+        """The other quest packs next to the open one, for Move to."""
         m = self.move_menu
         m.delete(0, "end")
         if not isinstance(self.pack, DlcPack) or self.slot is None:
@@ -1009,12 +1057,12 @@ class DlcTab(ttk.Frame):
         here = self.pack.path.name.lower()
         for n in GD.SAVE_PACKS:
             p = self.pack.path.with_name(n)
-            if n != GD.UNREAD_PACK and n != here and p.exists():
+            if n != here and p.exists():
                 m.add_command(label=f"{n}   ({GD.PACK_ROLES[n]})",
                               command=lambda p=p: self.move_quest(p))
         if m.index("end") is None:
-            m.add_command(label="(no quest1, quest3 or quest4 next to this "
-                                "pack)", state="disabled")
+            m.add_command(label="(no other quest pack next to this one)",
+                          state="disabled")
 
     def move_quest(self, target):
         """Move the selected quest, unchanged, to the first free slot of
@@ -1040,13 +1088,21 @@ class DlcTab(ttk.Frame):
             messagebox.showerror("Pack full", f"{dst.path.name} has no empty "
                                  "slot (a pack holds 20 quests).")
             return
-        for n in GD.EVENT_PACKS:            # the same number in the other one
+        src = dst.copied_from()
+        if src and not messagebox.askyesno(
+                "Move to", f"{GD.copy_problem(dst.path.name, src)}. #{no} "
+                f"won't show up there. Open {dst.path.name} to fix its header."
+                f"\n\nMove it anyway?", icon="warning"):
+            return
+        for n in GD.EVENT_PACKS:            # the same number in another one
             p = self.pack.path.with_name(n)
             if n == dst.path.name.lower() or p == self.pack.path \
                     or not p.exists():
                 continue
             try:
                 other = DlcPack(p)
+                if other.copied_from():     # the game skips it anyway
+                    continue
                 twin = next((i for i, x in other.quests()
                              if x.get("quest_no") == no), None)
             except (PackError, QuestFormatError, OSError):

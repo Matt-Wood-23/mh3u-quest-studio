@@ -92,11 +92,12 @@ Open a pack from **Cemu save packs** (or **Open pack…**). The menu lists the p
 
 ### Which packs the game reads
 
-- **Event quests go in `quest1` or `quest3`.** The Event Quests list reads only those two. The game never reads `quest2`, and `quest4` is the Arena's Challenge list (see below). The menu says what each pack is for, and **New quest…** refuses `quest2`.
+- **Event quests go in `quest1`, `quest2` or `quest3`.** The Event Quests list reads those three, in that order. `quest4` is the Arena's Challenge list (see below). The menu says what each pack is for.
+- **Don't make a pack by renaming a copy of another.** Each pack file carries its own name inside it, and the game skips a file that names another pack: a `quest1` copied to `quest2` by hand never shows up. Opening such a file offers to fix it. If it holds the same quests as the original, delete the duplicates, or the game may list them twice.
 - **Keep the quests together from slot 1.** The game reads as many slots from the top as the pack has quests, so a quest after an empty slot can be left out. **Delete quest** moves the quests after it up a slot. When an opened pack has a gap, the editor offers to close it.
 - **The game reads the packs when it starts.** Restart the game to see a change.
 
-Quests the game won't list are shown in red, and the save check says why. **Move to** puts the selected quest, unchanged, in another pack: use it to move quests out of `quest2`.
+Quests the game won't list are shown in red, and the save check says why. **Move to** puts the selected quest, unchanged, in another pack.
 
 **Export quest…** saves the selected quest as a single `q_<number>.quest` file, to send in an event quest without zipping the whole pack. It warns when the number isn't in the blocks community event quests use: 20150–20199 low rank, 20250–20299 high rank, 20350–20399 G rank.
 

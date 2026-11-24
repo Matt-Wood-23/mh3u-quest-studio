@@ -2,7 +2,7 @@
 (mlc01/usr/save/00050000/<title>/user/<id>/), plus loose .quest files.
 
 Pack layout (0x29024 bytes):
-  0x0000  0x28-byte header (kept verbatim)
+  0x0000  0x28-byte header (kept verbatim, but see the name hash below)
   0x0028  20 slots x 0x2010 bytes:
             0x0000  QTDS quest record, zero-padded to 0x2000
             0x2000  16-byte file name, e.g. 'q_20102.quest'
@@ -13,8 +13,13 @@ base-game quests (quest_format.Quest).
 The game counts a pack's filled slots (N) and reads only slots 1..N, so the
 quests have to sit together from slot 1: a quest after an empty slot can fall
 past the end and not show (gamedata.EVENT_PACKS has which packs it reads).
+
+Header +0x14 holds a hash of the file's own name (JAMCRC of 'quest1' etc., as
+in every save file). The game skips a pack whose hash is another file's: a
+quest1 copied to quest2 by hand is never read.
 """
 import shutil
+import zlib
 from pathlib import Path
 
 from .quest_format import Quest
@@ -24,6 +29,13 @@ SLOT = 0x2010
 DATA = 0x2000
 NAME = 16
 SLOTS = 20
+NAME_HASH = 0x14
+PACK_NAMES = ("quest1", "quest2", "quest3", "quest4")
+
+
+def name_hash(name):
+    """The hash a save file's header holds for its file name."""
+    return zlib.crc32(name.encode("ascii")) ^ 0xFFFFFFFF
 
 
 class PackError(ValueError):
@@ -49,6 +61,24 @@ class DlcPack:
         if len(self.data) < HEADER + SLOTS * SLOT:
             raise PackError(f"{self.path.name}: {len(self.data)} bytes is too "
                             f"small for a quest pack")
+
+    def copied_from(self):
+        """The pack this file is a renamed copy of, or None. Its header still
+        carries the other file's name hash, so the game skips it. Only packs
+        named quest1..quest4 are checked."""
+        name = self.path.name.lower()
+        if name not in PACK_NAMES:
+            return None
+        h = int.from_bytes(self.data[NAME_HASH:NAME_HASH + 4], "big")
+        if h == name_hash(name):
+            return None
+        return next((n for n in PACK_NAMES if n != name and name_hash(n) == h),
+                    None)
+
+    def fix_name_hash(self):
+        """Give the header this file's own name hash, so the game reads it."""
+        name = self.path.name.lower()
+        self.data[NAME_HASH:NAME_HASH + 4] = name_hash(name).to_bytes(4, "big")
 
     def _off(self, i):
         if not 0 <= i < SLOTS:

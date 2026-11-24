@@ -913,14 +913,14 @@ GRUDGE_LISTED = range(60000, 60012)
 CHALLENGE_LISTED = range(61000, 61010)
 CHALLENGE_PACK = "quest4"
 ARENA_B_RANK = 1800              # the game adds a fixed B rank of 30:00
-# The save folder's event packs. The Event Quests list reads quest1 and quest3
-# only, when the game starts; quest2 is never read. In each pack it counts the
+# The save folder's event packs. The Event Quests list reads quest1, quest2
+# and quest3, in that order, when the game starts. In each pack it counts the
 # filled slots (N) and reads slots 1..N, so a quest after an empty slot can
-# fall past the end and not show.
+# fall past the end and not show. A pack that is a renamed copy of another
+# (DlcPack.copied_from) is skipped whole.
 SAVE_PACKS = ("quest1", "quest2", "quest3", "quest4")
-EVENT_PACKS = ("quest1", "quest3")
-UNREAD_PACK = "quest2"
-PACK_ROLES = {"quest1": "event quests", "quest2": "not read by the game",
+EVENT_PACKS = ("quest1", "quest2", "quest3")
+PACK_ROLES = {"quest1": "event quests", "quest2": "event quests",
               "quest3": "event quests", "quest4": "Arena Challenge quests"}
 # Number blocks the community event quests use (Capcom's own are 20102-20104,
 # 20201-20210 and 20302-20324).
@@ -996,14 +996,17 @@ def pack_problem(quest_no, pack):
     if arena or quest_no in CHALLENGE_LISTED:
         return arena
     p = pack.lower()
-    if p == UNREAD_PACK:
-        return [f"the game never reads the {UNREAD_PACK} pack, so #{quest_no} "
-                f"won't show up; move it to quest1 or quest3"]
     if p == CHALLENGE_PACK:
         return [f"{CHALLENGE_PACK} only feeds the Arena's Challenge list "
                 f"(61000–61009), so #{quest_no} won't show up; event quests "
-                f"go in quest1 or quest3"]
+                f"go in quest1, quest2 or quest3"]
     return []
+
+
+def copy_problem(pack, original):
+    """Why nothing in a pack that is a renamed copy of `original` shows up."""
+    return (f"{pack} is a renamed copy of {original} (its header still says "
+            f"{original}), and the game skips the whole file")
 
 
 def community_block(quest_no):
